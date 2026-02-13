@@ -2,80 +2,85 @@ version: '3.8'
 
 services:
   # ==========================================
-  # SITE DATABASE (Isolated per site)
-  # ==========================================
-  db:
-    image: mariadb:10.11
-    container_name: ${PROJECT_NAME}_db
-    restart: always
-    environment:
-      MYSQL_ROOT_PASSWORD: ${DB_ROOT_PASSWORD}
-      MYSQL_DATABASE: ${DB_NAME}
-      MYSQL_USER: ${DB_USER}
-      MYSQL_PASSWORD: ${DB_PASSWORD}
-    volumes:
-      - db_data:/var/lib/mysql
-    networks:
-      - default
-      - wp_shared_net
-
-  # ==========================================
-  # WORDPRESS SITE
+  # [WEB] WORDPRESS CONTAINER
   # ==========================================
   wordpress:
-    image: wordpress:latest
+    build: .
     container_name: ${PROJECT_NAME}_wp
-    restart: always
-    depends_on:
-      - db
-    # Run the container process as the specific system user (UID:GID)
+    restart: unless-stopped
     user: "${SYS_UID}:${SYS_GID}"
     environment:
-      WORDPRESS_DB_HOST: db:3306
+      WORDPRESS_DB_HOST: db
       WORDPRESS_DB_USER: ${DB_USER}
       WORDPRESS_DB_PASSWORD: ${DB_PASSWORD}
       WORDPRESS_DB_NAME: ${DB_NAME}
-      # This helps WP know it's behind a proxy
       WORDPRESS_CONFIG_EXTRA: |
+        /* Force HTTPS */
+        if (isset($_SERVER['HTTP_X_FORWARDED_PROTO']) && $_SERVER['HTTP_X_FORWARDED_PROTO'] === 'https') {
+            $_SERVER['HTTPS'] = 'on';
+        }
+        /* Syncthing Fix (Direct IO) */
         define('FS_METHOD', 'direct');
+        /* Memory & Time Limits */
+        define('WP_MEMORY_LIMIT', '512M');
+        set_time_limit(300);
+        /* Redis Configuration */
+        define('WP_REDIS_HOST', 'redis');
+        define('WP_REDIS_PORT', 6379);
+
     volumes:
-      - ./html:/var/www/html
+      # We bind mount the entire root so Syncthing handles replication of ALL files.
+      # This allows plugins/updaters to write to host directly.
+      - ./:/var/www/html
+
+    depends_on:
+      - db
+      - redis
+    networks:
+      - wp_net
+      - wp_shared_net
     labels:
       - "traefik.enable=true"
       - "traefik.http.routers.${PROJECT_NAME}.rule=Host(`${DOMAIN_NAME}`)"
+      - "traefik.http.routers.${PROJECT_NAME}.entrypoints=websecure"
+      - "traefik.http.routers.${PROJECT_NAME}.tls=true"
+      - "traefik.http.routers.${PROJECT_NAME}.tls.certresolver=myresolver"
       - "traefik.http.services.${PROJECT_NAME}.loadbalancer.server.port=80"
-    networks:
-      - default
-      - wp_shared_net
 
   # ==========================================
-  # FRONTEND BUILDER (Runs as specific user)
+  # [DB] MARIADB CONTAINER
   # ==========================================
-  builder:
-    image: node:lts-alpine
-    container_name: ${PROJECT_NAME}_builder
-    working_dir: /app
-    user: "${SYS_UID}:${SYS_GID}"
-    volumes:
-      # Mount the project source code
-      - ./html/wp-content/themes/${THEME_NAME}:/app
-      # Mount the SHARED node_modules from the host volume
-      - shared_node_modules:/app/node_modules
+  db:
+    image: mariadb:10.6
+    container_name: ${PROJECT_NAME}_db
+    restart: unless-stopped
     environment:
-      - HOME=/tmp # Fix for potential permission issues with npm
-    command: sh -c "npx tailwindcss -i ./style.css -o ./output.css --watch"
+      MYSQL_DATABASE: ${DB_NAME}
+      MYSQL_USER: ${DB_USER}
+      MYSQL_PASSWORD: ${DB_PASSWORD}
+      MYSQL_ROOT_PASSWORD: ${DB_ROOT_PASSWORD}
+    volumes:
+      - db_data:/var/lib/mysql
     networks:
-      - wp_shared_net
+      - wp_net
+    command: >
+      --max-connections=100 --innodb-buffer-pool-size=128M --query-cache-type=0 --query-cache-size=0
+
+  # ==========================================
+  # [CACHE] REDIS
+  # ==========================================
+  redis:
+    image: redis:alpine
+    container_name: ${PROJECT_NAME}_redis
+    restart: unless-stopped
+    networks:
+      - wp_net
+
+networks:
+  wp_net:
+    internal: true
+  wp_shared_net:
+    external: true
 
 volumes:
   db_data:
-  shared_node_modules:
-    external: true
-    name: shared_node_modules
-
-networks:
-  default:
-    driver: bridge
-  wp_shared_net:
-    external: true
-    name: wp_shared_net

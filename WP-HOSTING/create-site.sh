@@ -66,6 +66,7 @@ EOF
 
 # Copy Template (assuming it exists)
 cp -r site-template/* "$SITE_DIR/" 2>/dev/null || true
+cp site-template/Dockerfile "$SITE_DIR/" 2>/dev/null || true
 
 # Set Permissions
 # ... (Original user creation logic) ...
