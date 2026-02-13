@@ -1,0 +1,105 @@
+---
+# ==========================================
+# WP-HOSTING CENTRAL DASHBOARD
+# ==========================================
+# This file defines what you see on http://panel.yourdomain.com
+# Edit this file to add new nodes, links, or services.
+
+- Control Panel:
+    - Portainer:
+        icon: portainer.png
+        href: "https://portainer.yourdomain.com"
+        description: "Scale & Deploy Containers"
+        widget:
+            type: portainer
+            url: http://central_portainer:9000
+            env: 1
+            key: "{{HOMEPAGE_VAR_PORTAINER_TOKEN}}"
+
+    - Traefik (Gateway):
+        icon: traefik.png
+        href: "https://gateway.yourdomain.com" # Dashboard enabled
+        description: "Reverse Proxy Rules"
+        widget:
+            type: traefik
+            url: http://shared_gateway:8080
+
+    - File Manager:
+        icon: filebrowser.png
+        href: "https://files.yourdomain.com"
+        description: "Manage Code & Configs"
+        widget:
+            type: docker
+            url: unix:///var/run/docker.sock
+            container: shared_filebrowser
+            cpu: true
+            memory: true
+
+    - Database (phpMyAdmin):
+        icon: phpmyadmin.png
+        href: "https://pma.yourdomain.com"
+        description: "MySQL Management"
+        widget:
+            type: docker
+            url: unix:///var/run/docker.sock
+            container: shared_pma
+            cpu: true
+            memory: true
+
+- Monitoring & Logs:
+    - Netdata (Full Metrics):
+        icon: netdata.png
+        href: "https://monitor.yourdomain.com"
+        description: "Real-time System Stats"
+        widget:
+            type: netdata
+            url: http://shared_netdata:19999
+            chart: system.cpu
+            units: "%"
+
+    - Uptime Kuma:
+        icon: uptime-kuma.png
+        href: "https://status.yourdomain.com"
+        description: "SLA Monitoring (Public Page)"
+        widget:
+            type: uptimekuma
+            url: http://central_uptime:3001
+            slug: default 
+
+    - Dozzle (Live Logs):
+        icon: dozzle.png
+        href: "https://logs.yourdomain.com"
+        description: "View Container Logs (Live)"
+        widget:
+            type: docker
+            url: unix:///var/run/docker.sock
+            container: central_logs
+            cpu: true
+            memory: false
+
+    - Mail Catcher (Mailpit):
+        icon: mailpit.png
+        href: "https://mail.yourdomain.com"
+        description: "Debug Site Emails"
+        widget:
+            type: mailpit
+            url: http://shared_mailpit:8025
+
+- Server Tools:
+    - Syncthing (Replication):
+        icon: syncthing.png
+        href: "http://panel.yourdomain.com:8384"
+        description: "Manage File Sync Pairs"
+        widget:
+            type: syncthing
+            url: http://shared_replication:8384
+            key: "{{HOMEPAGE_VAR_SYNCTHING_TOKEN}}"
+
+    - Developer Utils:
+        icon: si-javascript # Using generic icon
+        href: "https://utils.yourdomain.com"
+        description: "Cron, JSON, Base64 Tools"
+
+# ==========================================
+# REMOTE NODES (Added via script)
+# ==========================================

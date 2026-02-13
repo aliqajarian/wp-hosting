@@ -1,0 +1,119 @@
+version: '3.8'
+
+services:
+  # ==========================================
+  # [UI] HOMEPAGE (The Single Pane of Glass)
+  # ==========================================
+  homepage:
+    image: ghcr.io/gethomepage/homepage:latest
+    container_name: central_dashboard
+    volumes:
+      - ./homepage:/app/config
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+      - ../../sites:/app/sites # Allow dashboard to view site folders? No, config only.
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.homepage.rule=Host(`panel.localhost`)"
+      - "traefik.http.routers.homepage.entrypoints=websecure"
+      - "traefik.http.routers.homepage.tls.certresolver=myresolver"
+      - "traefik.http.services.homepage.loadbalancer.server.port=3000"
+    networks:
+      - wp_shared_net
+    restart: unless-stopped
+
+  # ==========================================
+  # [UI] PORTAINER SERVER (The Commander)
+  # ==========================================
+  portainer:
+    image: portainer/portainer-ce:latest
+    container_name: central_portainer
+    command: -H unix:///var/run/docker.sock
+    restart: always
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+      - portainer_data:/data
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.portainer.rule=Host(`portainer.localhost`)"
+      - "traefik.http.routers.portainer.entrypoints=websecure"
+      - "traefik.http.routers.portainer.tls.certresolver=myresolver"
+      - "traefik.http.services.portainer.loadbalancer.server.port=9000"
+    networks:
+      - wp_shared_net
+
+  # ==========================================
+  # [UI] UPTIME KUMA (The Pinger)
+  # ==========================================
+  uptime_kuma:
+    image: louislam/uptime-kuma:1
+    container_name: central_uptime
+    restart: always
+    volumes:
+      - uptime_kuma_data:/app/data
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.uptime.rule=Host(`status.localhost`)"
+      - "traefik.http.routers.uptime.entrypoints=websecure"
+      - "traefik.http.routers.uptime.tls.certresolver=myresolver"
+      - "traefik.http.services.uptime.loadbalancer.server.port=3001"
+    networks:
+      - wp_shared_net
+
+  # ==========================================
+  # [NEW] DOZZLE (Real-time Log Viewer)
+  # ==========================================
+  # View logs of ANY container from the web.
+  dozzle:
+    image: amir20/dozzle:latest
+    container_name: central_logs
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.logs.rule=Host(`logs.localhost`)"
+      - "traefik.http.routers.logs.entrypoints=websecure"
+      - "traefik.http.routers.logs.tls.certresolver=myresolver"
+      - "traefik.http.services.logs.loadbalancer.server.port=8080"
+    networks:
+      - wp_shared_net
+    restart: unless-stopped
+
+  # ==========================================
+  # [NEW] IT-TOOLS (Developer Utils)
+  # ==========================================
+  # JSON formatter, Base64, Cron generator, etc.
+  it_tools:
+    image: corentinth/it-tools:latest
+    container_name: central_utils
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.utils.rule=Host(`utils.localhost`)"
+      - "traefik.http.routers.utils.entrypoints=websecure"
+      - "traefik.http.routers.utils.tls.certresolver=myresolver"
+      - "traefik.http.services.utils.loadbalancer.server.port=80"
+    networks:
+      - wp_shared_net
+    restart: unless-stopped
+  # ==========================================
+  # [NEW] WIKI.JS (Documentation)
+  # ==========================================
+  # Host your internal docs (like REPLICATION.md) here.
+  # Using simple markdown-based wiki or just simple file server?
+  # Let's use simple MkDocs or similar? No, Wiki.js needs DB.
+  # Let's use a simpler static site generator or just raw file viewer?
+  # Actually, FileBrowser handles viewing MD files nicely.
+  # We just link to FileBrowser for now. 
+
+  # ==========================================
+  # [NEW] NGINX PROXY MANAGER?
+  # ==========================================
+  # No, we use Traefik. But Traefik Dashboard is useful.
+  # We link Traefik Dashboard in Homepage.
+
+networks:
+  wp_shared_net:
+    external: true
+
+volumes:
+  portainer_data:
+  uptime_kuma_data:
