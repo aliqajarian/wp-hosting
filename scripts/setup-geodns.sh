@@ -41,7 +41,7 @@ EOF
 
     # 2. BIND9 + UI Compose
     cat <<EOF > "$BIND_DIR/docker-compose.yml"
-version: '3.8'
+
 services:
   bind9:
     image: ubuntu/bind9:latest
