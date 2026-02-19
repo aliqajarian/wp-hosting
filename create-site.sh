@@ -43,10 +43,7 @@ fi
 BUILD_ARGS=""
 if [ "$COUNTRY" == "IR" ] || [ "$COUNTRY" == "Iran" ] || [ "$COUNTRY" == "UNKNOWN" ]; then
     echo "    [DETECTED: IRAN/RESTRICTED] Setting up Iranian mirrors for build..."
-    BUILD_ARGS="--build-arg MIRROR=mirror.arvancloud.ir \
-                 --build-arg WP_MIRROR=https://ir-mirror.ir/wordpress/latest-fa_IR.tar.gz \
-                 --build-arg WPCLI_MIRROR=https://ir-mirror.ir/wp-cli/wp-cli.phar \
-                 --build-arg IONCUBE_MIRROR=https://ir-mirror.ir/ioncube/loaders.tar.gz"
+    BUILD_ARGS="--build-arg MIRROR=mirror.arvancloud.ir"
 else
     echo "    [DETECTED: GLOBAL] Using official repositories."
 fi
