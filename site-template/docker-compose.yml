@@ -5,6 +5,8 @@ services:
   wordpress:
     build: .
     container_name: ${PROJECT_NAME}_wp
+    ports:
+      - "8081:80"
     restart: unless-stopped
     user: "${SYS_UID}:${SYS_GID}"
     environment:
@@ -12,19 +14,7 @@ services:
       WORDPRESS_DB_USER: ${DB_USER}
       WORDPRESS_DB_PASSWORD: ${DB_PASSWORD}
       WORDPRESS_DB_NAME: ${DB_NAME}
-      WORDPRESS_CONFIG_EXTRA: |
-        /* Force HTTPS */
-        if (isset($_SERVER['HTTP_X_FORWARDED_PROTO']) && $_SERVER['HTTP_X_FORWARDED_PROTO'] === 'https') {
-            $_SERVER['HTTPS'] = 'on';
-        }
-        /* Syncthing Fix (Direct IO) */
-        define('FS_METHOD', 'direct');
-        /* Memory & Time Limits */
-        define('WP_MEMORY_LIMIT', '512M');
-        set_time_limit(300);
-        /* Redis Configuration */
-        define('WP_REDIS_HOST', 'redis');
-        define('WP_REDIS_PORT', 6379);
+      WORDPRESS_CONFIG_EXTRA: require_once '/var/www/html/wp-custom.php';
 
     volumes:
       # We bind mount the entire root so Syncthing handles replication of ALL files.
@@ -34,6 +24,7 @@ services:
     depends_on:
       - db
       - redis
+      - memcached
     networks:
       - wp_net
       - wp_shared_net
@@ -61,6 +52,7 @@ services:
       - db_data:/var/lib/mysql
     networks:
       - wp_net
+      - wp_shared_net
     command: >
       --max-connections=100 --innodb-buffer-pool-size=128M --query-cache-type=0 --query-cache-size=0
 
@@ -70,6 +62,16 @@ services:
   redis:
     image: redis:alpine
     container_name: ${PROJECT_NAME}_redis
+    restart: unless-stopped
+    networks:
+      - wp_net
+
+  # ==========================================
+  # [CACHE] MEMCACHED
+  # ==========================================
+  memcached:
+    image: memcached:alpine
+    container_name: ${PROJECT_NAME}_memcached
     restart: unless-stopped
     networks:
       - wp_net

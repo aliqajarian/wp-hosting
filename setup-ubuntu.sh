@@ -24,6 +24,14 @@ if [ "$ROLE" == "manager" ] || [ "$ROLE" == "node" ]; then
 fi
 
 echo ">>> Updating system..."
+# Smart Mirror: Optimize for Iran if needed
+COUNTRY=$(curl -s --connect-timeout 2 http://ip-api.com/line?fields=countryCode || echo "UNKNOWN")
+if [ "$COUNTRY" == "IR" ]; then
+    echo "    [DETECTED: IRAN] Optimizing Ubuntu repositories..."
+    sed -i 's/archive.ubuntu.com/mirror.iranserver.com/g' /etc/apt/sources.list
+    sed -i 's/security.ubuntu.com/mirror.iranserver.com/g' /etc/apt/sources.list
+fi
+
 apt-get update && apt-get upgrade -y
 usermod -aG docker $USER || true
 

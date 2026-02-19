@@ -108,7 +108,7 @@ menu_list_sites() {
         for d in "$CURRENT_DIR/sites"/*/; do
              if [ -f "${d}docker-compose.yml" ]; then
                 FOLDER=$(basename "$d")
-                DOMAIN=$(grep "DOMAIN_NAME=" "${d}.env" | cut -d '=' -f2)
+                DOMAIN=$(grep "DOMAIN_NAME=" "${d}.env" | cut -d '=' -f2 | tr -d '\r')
                 if docker ps --format '{{.Names}}' | grep -q "${FOLDER}_wp"; then
                     STATUS="${GREEN}RUNNING${NC}"
                 else
@@ -124,9 +124,9 @@ menu_list_sites() {
     read -p "Press Enter to continue..."
 }
 
-# 5. Access Tools
+# 5. Access Site Tools
 menu_access_tools() {
-    echo -e "${GREEN}>>> Access Site Tools${NC}"
+    echo -e "${GREEN}>>> Access & Manage Site Tools${NC}"
     echo "Available Sites:"
     if [ -d "$CURRENT_DIR/sites" ]; then
          ls "$CURRENT_DIR/sites"
@@ -143,31 +143,57 @@ menu_access_tools() {
     fi
     
     echo ""
-    echo "1. Shell: WordPress Container (Run 'wp', 'ls')"
-    echo "2. Shell: Builder Container (Run 'npm', 'npx')"
-    echo "3. Shell: Database Container (Run 'mysql')"
+    echo "--- SERVICE CONTROL ---"
+    echo "1. Start Site"
+    echo "2. Stop Site"
+    echo "3. Restart Site"
     echo "4. View Live Logs"
-    echo "5. Localize Google Fonts (Download Vazirmatn...)"
-    echo "6. View Credentials (DB/SFTP)"
-    echo "7. Quick Replication Setup (Change Primary/Mode)"
+    echo "5. Fix Permissions (chown 1001:1001)"
+    echo ""
+    echo "--- TERMINAL ACCESS ---"
+    echo "6. Shell: WordPress Container (Run 'wp', 'ls')"
+    echo "7. Shell: Builder Container (Run 'npm', 'npx')"
+    echo "8. Shell: Database Container (Run 'mysql')"
+    echo ""
+    echo "--- ADVANCED ---"
+    echo "9. Localize Google Fonts (Download Vazirmatn...)"
+    echo "10. View Credentials (DB/SFTP)"
+    echo "11. Quick Replication Setup (Change Primary/Mode)"
     
-    read -p "Select Tool: " TOOL_OPT
+    read -p "Select Tool [1-11]: " TOOL_OPT
     
     case $TOOL_OPT in
-        1) docker exec -it "${SITE_NAME}_wp" bash ;;
-        2) docker exec -it "${SITE_NAME}_builder" sh ;;
-        3) docker exec -it "${SITE_NAME}_db" bash ;;
+        1) cd "$CURRENT_DIR/sites/$SITE_NAME" && docker compose up -d ;;
+        2) cd "$CURRENT_DIR/sites/$SITE_NAME" && docker compose stop ;;
+        3) cd "$CURRENT_DIR/sites/$SITE_NAME" && docker compose restart ;;
         4) cd "$CURRENT_DIR/sites/$SITE_NAME" && docker compose logs -f --tail=50 ;;
         5) 
-            read -p "Enter Font URL: " FURL
+            echo "Applying chown -R 1001:1001 to sites/$SITE_NAME..."
+            chown -R 1001:1001 "$CURRENT_DIR/sites/$SITE_NAME"
+            echo "Permissions fixed."
+            ;;
+        6) docker exec -it "${SITE_NAME}_wp" bash ;;
+        7) docker exec -it "${SITE_NAME}_builder" sh ;;
+        8) docker exec -it "${SITE_NAME}_db" bash ;;
+        9) 
+            echo ""
+            echo "Common Fonts:"
+            echo "  1. Vazirmatn (Persian) - All weights"
+            echo "  2. Custom URL"
+            read -p "Select [1-2]: " FOPT
+            if [ "$FOPT" == "1" ]; then
+                FURL="https://fonts.googleapis.com/css2?family=Vazirmatn:wght@100..900&display=swap"
+            else
+                read -p "Enter Google Fonts CSS URL: " FURL
+            fi
             bash ./scripts/localize-font.sh "$SITE_NAME" "$FURL" 
             ;;
-        6)
+        10)
             echo ""
             cat "$CURRENT_DIR/sites/$SITE_NAME/.env"
             echo ""
             ;;
-        7)
+        11)
             bash ./scripts/manage-replication.sh "$SITE_NAME"
             ;;
     esac
@@ -278,9 +304,10 @@ while true; do
     echo "6. Manage Server Stack"
     echo "7. Replication, Failover & Backups Console"
     echo "8. GeoDNS & Traffic Management"
-    echo "9. Exit"
+    echo "9. Update/Refresh All Sites (Apply Template Changes)"
+    echo "10. Exit"
     echo ""
-    read -p "Choose Option [1-9]: " CHOICE
+    read -p "Choose Option [1-10]: " CHOICE
     
     case $CHOICE in
         1) menu_install ;;
@@ -291,7 +318,8 @@ while true; do
         6) menu_manage_stack ;;
         7) menu_replication ;;
         8) menu_geodns ;;
-        9) exit 0 ;;
+        9) bash ./scripts/refresh-sites.sh ;;
+        10) exit 0 ;;
         *) echo "Invalid option." ;;
     esac
 done

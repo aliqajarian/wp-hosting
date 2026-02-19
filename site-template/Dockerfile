@@ -1,18 +1,23 @@
 FROM wordpress:latest
 
-# Install Build Dependencies (Temp)
-RUN apt-get update && apt-get install -y \
-    libonig-dev \
-    libzip-dev \
-    imagemagick \
-    libmagickwand-dev \
-    libgmp-dev \
-    && rm -rf /var/lib/apt/lists/*
+# Build argument for mirror
+ARG MIRROR="mirror.arvancloud.ir"
 
-# Install PHP Extensions
-# Added: bcmath, gmp, soap (WooCommerce Requirements)
-# Added: redis, imagick (Performance)
-RUN docker-php-ext-install \
+# Fix apt sources for Debian Trixie (Bookworm/Testing)
+RUN sed -i "s/deb.debian.org/$MIRROR/g" /etc/apt/sources.list.d/debian.sources && \
+    apt-get update
+
+# 1. Install Persian WordPress & Core (Download instead of COPY)
+RUN curl -o /tmp/wp-fa.tar.gz https://fa.wordpress.org/latest-fa_IR.tar.gz && \
+    tar -xzf /tmp/wp-fa.tar.gz -C /usr/src/ && \
+    rm /tmp/wp-fa.tar.gz && \
+    chown -R www-data:www-data /usr/src/wordpress/
+
+# 2. Use official extension installer
+COPY --from=mlocati/php-extension-installer /usr/bin/install-php-extensions /usr/local/bin/
+
+# 3. Install Extensions
+RUN install-php-extensions \
     mysqli \
     pdo_mysql \
     zip \
@@ -21,29 +26,28 @@ RUN docker-php-ext-install \
     exif \
     opcache \
     bcmath \
-    gmp
+    gmp \
+    redis \
+    imagick \
+    memcached
 
-# Redis & Imagick via PECL
-RUN pecl install redis && docker-php-ext-enable redis
-RUN pecl install imagick && docker-php-ext-enable imagick
+# 4. Install IonCube Loader (Download instead of COPY)
+RUN curl -o /tmp/ioncube.tar.gz https://downloads.ioncube.com/loader_downloads/ioncube_loaders_lin_x86-64.tar.gz && \
+    tar -xzf /tmp/ioncube.tar.gz -C /tmp/ && \
+    cp /tmp/ioncube/ioncube_loader_lin_$(php -r 'echo PHP_MAJOR_VERSION . "." . PHP_MINOR_VERSION;')*.so $(php -r "echo ini_get('extension_dir');")/ioncube_loader_lin_$(php -r 'echo PHP_MAJOR_VERSION . "." . PHP_MINOR_VERSION;').so && \
+    echo "zend_extension=ioncube_loader_lin_$(php -r 'echo PHP_MAJOR_VERSION . "." . PHP_MINOR_VERSION;').so" > /usr/local/etc/php/conf.d/00-ioncube.ini && \
+    rm -rf /tmp/ioncube /tmp/ioncube.tar.gz
+
+# 5. Install WP-CLI (Download instead of COPY)
+RUN curl -o /usr/local/bin/wp https://raw.githubusercontent.com/wp-cli/builds/gh-pages/phar/wp-cli.phar && \
+    chmod +x /usr/local/bin/wp
 
 # PHP.ini Optimizations
 RUN { \
-    echo 'upload_max_filesize = 64M'; \
-    echo 'post_max_size = 64M'; \
+    echo 'upload_max_filesize = 128M'; \
+    echo 'post_max_size = 128M'; \
     echo 'memory_limit = 512M'; \
     echo 'max_execution_time = 300'; \
-    echo 'max_input_vars = 5000'; \
-    echo 'opcache.enable=1'; \
-    echo 'opcache.memory_consumption=128'; \
-    echo 'opcache.interned_strings_buffer=8'; \
-    echo 'opcache.max_accelerated_files=10000'; \
-    echo 'opcache.revalidate_freq=60'; \
-    echo 'opcache.fast_shutdown=1'; \
     } > /usr/local/etc/php/conf.d/wp-recommended.ini
 
-# Enable Apache Modules
 RUN a2enmod rewrite headers expires
-
-# Clean up apt cache
-RUN apt-get clean && rm -rf /var/lib/apt/lists/*

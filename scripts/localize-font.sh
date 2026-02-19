@@ -3,8 +3,11 @@
 # ==========================================
 # LOCALIZE GOOGLE FONTS
 # ==========================================
-# Downloads Google Fonts and CSS to the local theme folder.
-# Usage: ./localize-font.sh <site-name> <google-fonts-css-url>
+# Downloads Google Fonts (WOFF2) and CSS to the active theme's fonts/ folder.
+# Rewrites CSS to use local paths. No external requests at runtime.
+#
+# Usage: ./localize-font.sh <site-name> "<google-fonts-css-url>"
+# Example: ./localize-font.sh client1 "https://fonts.googleapis.com/css2?family=Vazirmatn:wght@100..900&display=swap"
 
 SITE_NAME=$1
 FONT_URL=$2
@@ -15,79 +18,154 @@ if [ -z "$SITE_NAME" ] || [ -z "$FONT_URL" ]; then
     exit 1
 fi
 
-SITE_DIR="/opt/wp-hosting/sites/$SITE_NAME"
-THEME_PATH="html/wp-content/themes"
+CONTAINER="${SITE_NAME}_wp"
 
-# Find the active theme (assume the first one found or 'my-theme')
-# We need to run inside the builder container to have correct permissions/tools
-CONTAINER="${SITE_NAME}_builder"
-
-echo ">>> Localizing Fonts for $SITE_NAME..."
-
-# Create a temporary script inside the container to handle the download logic
-# This ensures we use the container's curl/wget and file system context
-cat <<EOF > /tmp/download_logic.sh
-#!/bin/sh
-# Navigate to theme dir (assumed /app mapped to active theme)
-cd /app
-
-mkdir -p fonts
-echo "--> Fetching CSS from Google..."
-
-# 1. Download the CSS
-# We need a user agent string or Google might reject/give WOFF1
-wget -U "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/90.0.4430.93 Safari/537.36" -O fonts/fonts.css "$FONT_URL"
-
-if [ ! -f "fonts/fonts.css" ]; then
-    echo "Error: Failed to download CSS."
+# Verify container is running
+if ! docker ps --format '{{.Names}}' | grep -q "^${CONTAINER}$"; then
+    echo "[ERROR] Container '$CONTAINER' is not running."
+    echo "Start it first: cd sites/$SITE_NAME && docker compose up -d"
     exit 1
 fi
 
-echo "--> Downloading WOFF2 files..."
+echo ">>> Localizing Fonts for $SITE_NAME..."
 
-# 2. Extract URLs and Download
-# Simple parser to find https://...woff2
-# Alpine grep might differ, so we use a simple loop with sed/awk if needed.
-# Converting CSS to use local paths as we go.
-
-# Read line by line
-temp_css=""
-counter=1
-
-while IFS= read -r line; do
-    # Check if line contains a url
-    if echo "\$line" | grep -q "url(https://"; then
-        # Extract URL
-        url=\$(echo "\$line" | sed -n 's/.*url(\(https:\/\/[^)]*\)).*/\1/p')
-        filename="font_\$counter.woff2"
-        
-        # Download file
-        wget -q -O "fonts/\$filename" "\$url"
-        
-        # Replace URL in line with local path
-        line=\$(echo "\$line" | sed "s|https://[^)]*|./\$filename|")
-        
-        counter=\$((counter+1))
+# --- Step 1: Find the active theme directory ---
+echo "--> Detecting active theme..."
+ACTIVE_THEME=$(docker exec "$CONTAINER" bash -c "
+    if [ -f /var/www/html/wp-includes/version.php ]; then
+        # Try to get theme from database via wp-cli
+        THEME=\$(wp theme list --status=active --field=name --allow-root 2>/dev/null | head -1)
+        if [ -n \"\$THEME\" ]; then
+            echo \"\$THEME\"
+        else
+            # Fallback: find first non-default theme
+            ls /var/www/html/wp-content/themes/ | grep -v twenty | head -1
+        fi
     fi
-    echo "\$line" >> fonts/local-fonts.css
-done < fonts/fonts.css
+")
 
-# Cleanup
-mv fonts/local-fonts.css fonts/fonts.css
-rm /tmp/download_logic.sh
+if [ -z "$ACTIVE_THEME" ]; then
+    echo "[WARN] Could not auto-detect theme. Listing available themes:"
+    docker exec "$CONTAINER" ls /var/www/html/wp-content/themes/
+    read -p "Enter theme folder name: " ACTIVE_THEME
+fi
 
-echo "--> Success! Font Files saved to /app/fonts/"
-echo "--> Import 'fonts/fonts.css' in your Tailwind CSS or style.css"
-EOF
+THEME_DIR="/var/www/html/wp-content/themes/$ACTIVE_THEME"
+FONT_DIR="$THEME_DIR/fonts"
+echo "--> Using theme: $ACTIVE_THEME"
+echo "--> Font directory: $FONT_DIR"
 
-# Copy logic to container (via docker cp logic or just catting it into a file inside)
-# Since we can't easily docker cp TO a container without source file, we'll pipe it.
-# Actually, 'docker exec -i' reading from stdin to a file is easiest.
+# --- Step 2: Create the download script and execute inside the container ---
+echo "--> Downloading fonts inside container..."
 
-# 1. Write script to container
-cat /tmp/download_logic.sh | docker exec -i "$CONTAINER" sh -c 'cat > /tmp/run_dl.sh && chmod +x /tmp/run_dl.sh'
+docker exec "$CONTAINER" bash -c "
+set -e
 
-# 2. Run it
-docker exec "$CONTAINER" /tmp/run_dl.sh
+FONT_DIR='$FONT_DIR'
+FONT_URL='$FONT_URL'
 
-echo ">>> Done. Add '@import \"./fonts/fonts.css\";' to your theme's style.css"
+mkdir -p \"\$FONT_DIR\"
+
+# 1. Download the CSS file (with Chrome User-Agent to get WOFF2 format)
+echo '    Fetching CSS from Google Fonts...'
+if command -v wget &>/dev/null; then
+    wget -q -U 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36' \
+        -O \"\$FONT_DIR/google-fonts-original.css\" \"\$FONT_URL\"
+elif command -v curl &>/dev/null; then
+    curl -s -A 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36' \
+        -o \"\$FONT_DIR/google-fonts-original.css\" \"\$FONT_URL\"
+else
+    echo '[ERROR] Neither wget nor curl found in container!'
+    exit 1
+fi
+
+if [ ! -s \"\$FONT_DIR/google-fonts-original.css\" ]; then
+    echo '[ERROR] Failed to download CSS from Google Fonts.'
+    exit 1
+fi
+
+echo '    CSS downloaded successfully.'
+
+# 2. Extract all font file URLs and download them
+echo '    Downloading WOFF2 font files...'
+counter=0
+cp \"\$FONT_DIR/google-fonts-original.css\" \"\$FONT_DIR/fonts.css\"
+
+# Extract all url(...) entries that point to font files
+grep -oP 'url\(\Khttps://[^)]+' \"\$FONT_DIR/google-fonts-original.css\" | while read -r url; do
+    counter=\$((counter + 1))
+    
+    # Determine file extension from URL
+    ext='woff2'
+    if echo \"\$url\" | grep -q '\.woff\b'; then ext='woff'; fi
+    if echo \"\$url\" | grep -q '\.ttf'; then ext='ttf'; fi
+    
+    filename=\"font_\${counter}.\${ext}\"
+    
+    # Download the font file
+    if command -v wget &>/dev/null; then
+        wget -q -O \"\$FONT_DIR/\$filename\" \"\$url\"
+    else
+        curl -s -o \"\$FONT_DIR/\$filename\" \"\$url\"
+    fi
+    
+    # Replace the remote URL with local path in the CSS
+    # Using | as sed delimiter since URLs contain /
+    escaped_url=\$(echo \"\$url\" | sed 's|[&/\]|\\\\&|g')
+    sed -i \"s|\$escaped_url|./\$filename|g\" \"\$FONT_DIR/fonts.css\"
+    
+    echo \"    [\$counter] Downloaded: \$filename\"
+done
+
+# Cleanup the original
+rm -f \"\$FONT_DIR/google-fonts-original.css\"
+
+echo '    All font files downloaded!'
+echo ''
+echo '    === FILES ==='
+ls -la \"\$FONT_DIR/\"
+"
+
+if [ $? -ne 0 ]; then
+    echo "[ERROR] Font download failed."
+    exit 1
+fi
+
+# --- Step 3: Create the WordPress enqueue snippet ---
+echo ""
+echo "==========================================="
+echo "  ✅ FONTS LOCALIZED SUCCESSFULLY!"
+echo "==========================================="
+echo ""
+echo "Font files saved to: $FONT_DIR/"
+echo ""
+echo "--- NEXT STEPS ---"
+echo ""
+echo "OPTION A: Add to theme's style.css (simplest):"
+echo "  Add this line at the TOP of your theme's style.css:"
+echo "  @import url('./fonts/fonts.css');"
+echo ""
+echo "OPTION B: Enqueue via functions.php (recommended):"
+echo "  Add this to your theme's functions.php:"
+echo ""
+cat <<'SNIPPET'
+  // Load Local Fonts (instead of Google Fonts)
+  function enqueue_local_fonts() {
+      wp_enqueue_style(
+          'local-fonts',
+          get_template_directory_uri() . '/fonts/fonts.css',
+          array(),
+          '1.0'
+      );
+  }
+  add_action('wp_enqueue_scripts', 'enqueue_local_fonts');
+SNIPPET
+echo ""
+echo "OPTION C: Use a plugin like 'OMGF (Optimize My Google Fonts)'"
+echo "  to auto-host Google Fonts locally."
+echo ""
+echo "--- IMPORTANT ---"
+echo "After adding the fonts, you should also DEQUEUE the remote"
+echo "Google Fonts request to avoid double-loading. Check your theme"
+echo "or Elementor settings for Google Fonts and set it to 'None'."
+echo ""
