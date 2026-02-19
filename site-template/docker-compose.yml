@@ -97,18 +97,7 @@ services:
     # Default command: Watch for changes in input.css and compile to output.css
     # You can override this or run specific commands via 'docker exec'
     command: >
-      sh -c " # Copy Lucide files if available and missing if [ -f /shared/node_modules/lucide/dist/lucide-sprite.svg ] && [ ! -f lucide-sprite.svg ]; then
-        cp /shared/node_modules/lucide/dist/lucide-sprite.svg .
-        echo 'Lucide sprite copied.';
-      fi; if [ -f /shared/node_modules/lucide/dist/umd/lucide.min.js ] && [ ! -f lucide.min.js ]; then
-        cp /shared/node_modules/lucide/dist/umd/lucide.min.js .
-        echo 'Lucide JS copied.';
-      fi; # Start Tailwind Watcher if [ -f input.css ]; then 
-        npx tailwindcss -i ./input.css -o ./output.css --watch --poll; 
-      else 
-        echo 'No input.css found. Waiting...'; 
-        tail -f /dev/null; 
-      fi"
+      sh -c "if [ -f /shared/node_modules/lucide/dist/lucide-sprite.svg ] && [ ! -f lucide-sprite.svg ]; then cp /shared/node_modules/lucide/dist/lucide-sprite.svg . && echo 'Lucide sprite copied.'; fi; if [ -f /shared/node_modules/lucide/dist/umd/lucide.min.js ] && [ ! -f lucide.min.js ]; then cp /shared/node_modules/lucide/dist/umd/lucide.min.js . && echo 'Lucide JS copied.'; fi; if [ -f input.css ]; then npx tailwindcss -i ./input.css -o ./output.css --watch --poll; else echo 'No input.css found. Waiting...'; tail -f /dev/null; fi"
     networks:
       - wp_net
 

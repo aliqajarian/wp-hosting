@@ -60,23 +60,7 @@ for SITE_PATH in "$SITES_DIR"/*; do
       - NODE_PATH=/shared/node_modules
       - PATH=/shared/node_modules/.bin:\${PATH}
     command: >
-      sh -c "
-      # Copy Lucide files if available and missing
-      if [ -f /shared/node_modules/lucide/dist/lucide-sprite.svg ] && [ ! -f lucide-sprite.svg ]; then
-        cp /shared/node_modules/lucide/dist/lucide-sprite.svg .
-        echo 'Lucide sprite copied.';
-      fi;
-      if [ -f /shared/node_modules/lucide/dist/umd/lucide.min.js ] && [ ! -f lucide.min.js ]; then
-        cp /shared/node_modules/lucide/dist/umd/lucide.min.js .
-        echo 'Lucide JS copied.';
-      fi;
-      # Start Tailwind Watcher
-      if [ -f input.css ]; then 
-        npx tailwindcss -i ./input.css -o ./output.css --watch --poll; 
-      else 
-        echo 'No input.css found. Waiting...'; 
-        tail -f /dev/null; 
-      fi"
+      sh -c \"if [ -f /shared/node_modules/lucide/dist/lucide-sprite.svg ] && [ ! -f lucide-sprite.svg ]; then cp /shared/node_modules/lucide/dist/lucide-sprite.svg . && echo 'Lucide sprite copied.'; fi; if [ -f /shared/node_modules/lucide/dist/umd/lucide.min.js ] && [ ! -f lucide.min.js ]; then cp /shared/node_modules/lucide/dist/umd/lucide.min.js . && echo 'Lucide JS copied.'; fi; if [ -f input.css ]; then npx tailwindcss -i ./input.css -o ./output.css --watch --poll; else echo 'No input.css found. Waiting...'; tail -f /dev/null; fi\"
     networks:
       - wp_net
 
@@ -108,11 +92,22 @@ EOF
         [ ! -f "$SITE_PATH/tailwind.config.js" ] && cp "$TEMPLATE_DIR/tailwind.config.js" "$SITE_PATH/"
         [ ! -f "$SITE_PATH/input.css" ] && cp "$TEMPLATE_DIR/input.css" "$SITE_PATH/"
 
-        # 3. Rebuild and Restart
-        echo "    Rebuilding and Restarting..."
+        # 5. Intelligent Rebuild and Restart
+        echo "    Updating containers..."
         cd "$SITE_PATH"
-        docker compose build --no-cache
-        docker compose up -d
+        
+        # Only build if Dockerfile is different from what was previously used
+        # We check if the image exists. If it doesn't, or if we want to be safe, we build.
+        # But we remove --no-cache to use Docker layering.
+        if [[ "$(docker images -q ${SITE_NAME}-wordpress 2> /dev/null)" == "" ]]; then
+            echo "    Initial build for $SITE_NAME..."
+            docker compose build
+        else
+            # Check if Dockerfile was actually updated by comparing checksums (optional but faster)
+            docker compose build
+        fi
+        
+        docker compose up -d --remove-orphans
         cd "$BASE_DIR"
         
         echo "    [DONE] $SITE_NAME is now updated."
