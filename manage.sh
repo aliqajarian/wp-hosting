@@ -301,27 +301,32 @@ while true; do
     echo "1. Server Setup (Manager vs Worker Role)"
     echo "2. Add Remote Worker Node (Manager Only - Central Monitoring)"
     echo "3. Create New Site"
-    echo "4. List Local Sites (Simple)"
-    echo "5. Access Site Tools (Shell, Logs, Fonts, Creds)"
-    echo "6. Manage Server Stack"
-    echo "7. Replication, Failover & Backups Console"
-    echo "8. GeoDNS & Traffic Management"
-    echo "9. Update/Refresh All Sites (Apply Template Changes)"
-    echo "10. Exit"
+    echo "4. DELETE A SITE (Safe Cleanup)"
+    echo "5. List Local Sites (Simple)"
+    echo "6. Access Site Tools (Shell, Logs, Fonts, Creds)"
+    echo "7. Manage Server Stack"
+    echo "8. Replication, Failover & Backups Console"
+    echo "9. GeoDNS & Traffic Management"
+    echo "10. Update/Refresh All Sites (Apply Template Changes)"
+    echo "11. Exit"
     echo ""
-    read -p "Choose Option [1-10]: " CHOICE
+    read -p "Choose Option [1-11]: " CHOICE
     
     case $CHOICE in
         1) menu_install ;;
         2) menu_add_worker ;;
         3) menu_create_site ;;
-        4) menu_list_sites ;;
-        5) menu_access_tools ;;
-        6) menu_manage_stack ;;
-        7) menu_replication ;;
-        8) menu_geodns ;;
-        9) bash ./scripts/refresh-sites.sh ;;
-        10) exit 0 ;;
+        4) 
+            read -p "Enter Site Name to DELETE: " D_SITE
+            bash ./scripts/delete-site.sh "$D_SITE"
+            ;;
+        5) menu_list_sites ;;
+        6) menu_access_tools ;;
+        7) menu_manage_stack ;;
+        8) menu_replication ;;
+        9) menu_geodns ;;
+        10) bash ./scripts/refresh-sites.sh ;;
+        11) exit 0 ;;
         *) echo "Invalid option." ;;
     esac
 done

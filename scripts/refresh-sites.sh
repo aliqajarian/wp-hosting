@@ -45,8 +45,19 @@ for SITE_PATH in "$SITES_DIR"/*; do
 
         # 3. Pull/Rebuild and Restart
         echo "    Rebuilding and Restarting..."
+        
+        # Detect Proxy Support
+        PROXY_ARGS=""
+        if [ -n "$all_proxy" ] || [ -n "$http_proxy" ]; then
+            HOST_GATEWAY=$(docker network inspect bridge --format='{{(index .IPAM.Config 0).Gateway}}' 2>/dev/null || echo "172.17.0.1")
+            fix_proxy() { echo "$1" | sed "s/127.0.0.1/$HOST_GATEWAY/g; s/localhost/$HOST_GATEWAY/g"; }
+            [ -n "$http_proxy" ]  && PROXY_ARGS="$PROXY_ARGS --build-arg http_proxy=$(fix_proxy "$http_proxy")"
+            [ -n "$https_proxy" ] && PROXY_ARGS="$PROXY_ARGS --build-arg https_proxy=$(fix_proxy "$https_proxy")"
+            [ -n "$all_proxy" ]   && PROXY_ARGS="$PROXY_ARGS --build-arg all_proxy=$(fix_proxy "$all_proxy")"
+        fi
+
         cd "$SITE_PATH"
-        docker compose up -d --build
+        docker compose up -d --build $PROXY_ARGS
         cd "$BASE_DIR"
         
         echo "    [DONE] $SITE_NAME is now updated."
