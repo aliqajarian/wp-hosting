@@ -61,10 +61,14 @@ for SITE_PATH in "$SITES_DIR"/*; do
       - PATH=/shared/node_modules/.bin:\${PATH}
     command: >
       sh -c "
-      # Copy Lucide sprite if available and missing
+      # Copy Lucide files if available and missing
       if [ -f /shared/node_modules/lucide/dist/lucide-sprite.svg ] && [ ! -f lucide-sprite.svg ]; then
         cp /shared/node_modules/lucide/dist/lucide-sprite.svg .
-        echo 'Lucide sprite copied to site root.';
+        echo 'Lucide sprite copied.';
+      fi;
+      if [ -f /shared/node_modules/lucide/dist/umd/lucide.min.js ] && [ ! -f lucide.min.js ]; then
+        cp /shared/node_modules/lucide/dist/umd/lucide.min.js .
+        echo 'Lucide JS copied.';
       fi;
       # Start Tailwind Watcher
       if [ -f input.css ]; then 
