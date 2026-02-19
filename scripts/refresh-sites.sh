@@ -59,8 +59,7 @@ for SITE_PATH in "$SITES_DIR"/*; do
     environment:
       - NODE_PATH=/shared/node_modules
       - PATH=/shared/node_modules/.bin:\${PATH}
-    command: >
-      sh -c \"if [ -f /shared/node_modules/lucide/dist/lucide-sprite.svg ] && [ ! -f lucide-sprite.svg ]; then cp /shared/node_modules/lucide/dist/lucide-sprite.svg . && echo 'Lucide sprite copied.'; fi; if [ -f /shared/node_modules/lucide/dist/umd/lucide.min.js ] && [ ! -f lucide.min.js ]; then cp /shared/node_modules/lucide/dist/umd/lucide.min.js . && echo 'Lucide JS copied.'; fi; if [ -f input.css ]; then npx tailwindcss -i ./input.css -o ./output.css --watch --poll; else echo 'No input.css found. Waiting...'; tail -f /dev/null; fi\"
+    command: sh /var/www/html/builder.sh
     networks:
       - wp_net
 
@@ -88,7 +87,8 @@ EOF
              fi
         fi
 
-        # 4. Copy Tailwind files if missing
+        # 4. Copy Builder & Tailwind files if missing
+        [ ! -f "$SITE_PATH/builder.sh" ] && cp "$TEMPLATE_DIR/builder.sh" "$SITE_PATH/"
         [ ! -f "$SITE_PATH/tailwind.config.js" ] && cp "$TEMPLATE_DIR/tailwind.config.js" "$SITE_PATH/"
         [ ! -f "$SITE_PATH/input.css" ] && cp "$TEMPLATE_DIR/input.css" "$SITE_PATH/"
 
