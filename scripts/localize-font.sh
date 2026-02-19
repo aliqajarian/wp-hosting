@@ -31,7 +31,7 @@ echo ">>> Localizing Fonts for $SITE_NAME..."
 
 # --- Step 1: Find the active theme directory ---
 echo "--> Detecting active theme..."
-ACTIVE_THEME=$(docker exec "$CONTAINER" bash -c "
+ACTIVE_THEME=$(docker exec -u root "$CONTAINER" bash -c "
     if [ -f /var/www/html/wp-includes/version.php ]; then
         # Try to get theme from database via wp-cli
         THEME=\$(wp theme list --status=active --field=name --allow-root 2>/dev/null | head -1)
@@ -58,7 +58,7 @@ echo "--> Font directory: $FONT_DIR"
 # --- Step 2: Create the download script and execute inside the container ---
 echo "--> Downloading fonts inside container..."
 
-docker exec "$CONTAINER" bash -c "
+docker exec -u root "$CONTAINER" bash -c "
 set -e
 
 FONT_DIR='$FONT_DIR'
@@ -116,6 +116,9 @@ grep -oP 'url\(\Khttps://[^)]+' \"\$FONT_DIR/google-fonts-original.css\" | while
     
     echo \"    [\$counter] Downloaded: \$filename\"
 done
+
+# Fix permissions so the web user (1001) can use these files
+chown -R 1001:1001 \"\$FONT_DIR\"
 
 # Cleanup the original
 rm -f \"\$FONT_DIR/google-fonts-original.css\"
