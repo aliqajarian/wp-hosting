@@ -147,34 +147,33 @@ menu_access_tools() {
     echo "1. Start Site"
     echo "2. Stop Site"
     echo "3. Restart Site"
-    echo "4. View Live Logs"
+    echo "4. View Live Logs (Targeting WordPress)"
     echo "5. Fix Permissions (chown 1001:1001)"
     echo ""
     echo "--- TERMINAL ACCESS ---"
     echo "6. Shell: WordPress Container (Run 'wp', 'ls')"
-    echo "7. Shell: Builder Container (Run 'npm', 'npx')"
-    echo "8. Shell: Database Container (Run 'mysql')"
+    echo "7. Shell: Database Container (Run 'mysql')"
     echo ""
     echo "--- ADVANCED ---"
     echo "9. Localize Google Fonts (Download Vazirmatn...)"
     echo "10. View Credentials (DB/SFTP)"
     echo "11. Quick Replication Setup (Change Primary/Mode)"
+    echo "12. DELETE SITE (Permanent)"
     
-    read -p "Select Tool [1-11]: " TOOL_OPT
+    read -p "Select Tool [1-12]: " TOOL_OPT
     
     case $TOOL_OPT in
         1) cd "$CURRENT_DIR/sites/$SITE_NAME" && docker compose up -d ;;
         2) cd "$CURRENT_DIR/sites/$SITE_NAME" && docker compose stop ;;
         3) cd "$CURRENT_DIR/sites/$SITE_NAME" && docker compose restart ;;
-        4) cd "$CURRENT_DIR/sites/$SITE_NAME" && docker compose logs -f --tail=50 ;;
+        4) docker logs -f --tail=100 "${SITE_NAME}_wp" ;;
         5) 
             echo "Applying chown -R 1001:1001 to sites/$SITE_NAME..."
             chown -R 1001:1001 "$CURRENT_DIR/sites/$SITE_NAME"
             echo "Permissions fixed."
             ;;
         6) docker exec -it "${SITE_NAME}_wp" bash ;;
-        7) docker exec -it "${SITE_NAME}_builder" sh ;;
-        8) docker exec -it "${SITE_NAME}_db" bash ;;
+        7) docker exec -it "${SITE_NAME}_db" bash ;;
         9) 
             echo ""
             echo "Common Fonts:"
@@ -195,6 +194,9 @@ menu_access_tools() {
             ;;
         11)
             bash ./scripts/manage-replication.sh "$SITE_NAME"
+            ;;
+        12)
+            bash ./scripts/delete-site.sh "$SITE_NAME"
             ;;
     esac
     read -p "Press Enter to continue..."

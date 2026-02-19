@@ -31,11 +31,22 @@ echo ">>> Creating site $SITE_NAME ($DOMAIN_NAME)..."
 
 # 1. Location Detection (Smart Mirror)
 echo ">>> Checking location for optimal mirrors..."
-COUNTRY=$(curl -s --connect-timeout 2 http://ip-api.com/line?fields=countryCode || echo "UNKNOWN")
+if [ "$FORCE_IR" == "true" ]; then
+    COUNTRY="IR"
+else
+    # Try multiple services in case one is blocked
+    COUNTRY=$(curl -s --connect-timeout 3 http://ip-api.com/line?fields=countryCode || \
+              curl -s --connect-timeout 3 https://ipapi.co/country/ || \
+              echo "UNKNOWN")
+fi
+
 BUILD_ARGS=""
-if [ "$COUNTRY" == "IR" ]; then
-    echo "    [DETECTED: IRAN] Setting up ArvanCloud mirrors for build..."
-    BUILD_ARGS="--build-arg MIRROR=mirror.arvancloud.ir"
+if [ "$COUNTRY" == "IR" ] || [ "$COUNTRY" == "Iran" ] || [ "$COUNTRY" == "UNKNOWN" ]; then
+    echo "    [DETECTED: IRAN/RESTRICTED] Setting up Iranian mirrors for build..."
+    BUILD_ARGS="--build-arg MIRROR=mirror.arvancloud.ir \
+                 --build-arg WP_MIRROR=https://ir-mirror.ir/wordpress/latest-fa_IR.tar.gz \
+                 --build-arg WPCLI_MIRROR=https://ir-mirror.ir/wp-cli/wp-cli.phar \
+                 --build-arg IONCUBE_MIRROR=https://ir-mirror.ir/ioncube/loaders.tar.gz"
 else
     echo "    [DETECTED: GLOBAL] Using official repositories."
 fi
@@ -106,9 +117,16 @@ fi
 
 # 7. Launch Site
 echo ">>> Launching containers for $SITE_NAME..."
+
+# Detect Proxy Support (if using SSH Tunnel/VPN)
+PROXY_ARGS=""
+[ -n "$http_proxy" ]  && PROXY_ARGS="$PROXY_ARGS --build-arg http_proxy=$http_proxy"
+[ -n "$https_proxy" ] && PROXY_ARGS="$PROXY_ARGS --build-arg https_proxy=$https_proxy"
+[ -n "$all_proxy" ]   && PROXY_ARGS="$PROXY_ARGS --build-arg all_proxy=$all_proxy"
+
 cd "$SITE_DIR"
-if [ ! -z "$BUILD_ARGS" ]; then
-    docker compose build $BUILD_ARGS
+if [ ! -z "$BUILD_ARGS" ] || [ ! -z "$PROXY_ARGS" ]; then
+    docker compose build $BUILD_ARGS $PROXY_ARGS
 fi
 docker compose up -d
 
