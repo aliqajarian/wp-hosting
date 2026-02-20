@@ -5,7 +5,13 @@ module.exports = {
         './wp-content/themes/**/*.js',
     ],
     theme: {
-        extend: {},
+        extend: {
+            fontFamily: {
+                'vazir': ['Vazirmatn', 'ui-sans-serif', 'system-ui', 'sans-serif'],
+                'lalezar': ['Lalezar', 'cursive'],
+                'yekan': ['YekanBakh', 'sans-serif'],
+            },
+        },
     },
     plugins: [],
 }

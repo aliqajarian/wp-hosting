@@ -90,12 +90,24 @@ EOF
             fi
         fi
 
-        # 4. Copy Builder & Tailwind files
+        # 4. Copy Assets, Scripts & Fonts
+        echo "    Mirroring assets and configurations from template..."
+        
+        # We always overwrite these to ensure fonts and latest builder logic are synced
         cp "$TEMPLATE_DIR/builder.sh" "$SITE_PATH/builder.sh"
+        cp "$TEMPLATE_DIR/tailwind.config.js" "$SITE_PATH/tailwind.config.js"
+        cp "$TEMPLATE_DIR/input.css" "$SITE_PATH/input.css"
+        
+        # Fix line endings for scripts
         sed -i 's/\r$//' "$SITE_PATH/builder.sh" 2>/dev/null
         chmod +x "$SITE_PATH/builder.sh"
-        [ ! -f "$SITE_PATH/tailwind.config.js" ] && cp "$TEMPLATE_DIR/tailwind.config.js" "$SITE_PATH/"
-        [ ! -f "$SITE_PATH/input.css" ] && cp "$TEMPLATE_DIR/input.css" "$SITE_PATH/"
+
+        # Ensure fonts directory exists and has the template fonts
+        if [ -d "$TEMPLATE_DIR/fonts" ]; then
+            mkdir -p "$SITE_PATH/fonts"
+            cp -r "$TEMPLATE_DIR/fonts/"* "$SITE_PATH/fonts/" 2>/dev/null
+            echo "    Fonts synced."
+        fi
 
         # 5. Intelligent Rebuild and Restart
         echo "    Updating containers..."
