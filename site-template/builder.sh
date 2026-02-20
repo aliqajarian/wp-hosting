@@ -4,7 +4,13 @@
 # Handles Tailwind & Lucide Assets
 # ------------------------------------------------------------------------------
 
-# 1. Copy Lucide Assets (if available in shared volume)
+# 1. Harvest per-page configs
+if [ -f config-harvester.js ]; then
+    echo "🔍 Harvesting per-page Tailwind configs..."
+    node config-harvester.js
+fi
+
+# 2. Copy Lucide Assets (if available in shared volume)
 if [ -f /shared/node_modules/lucide/dist/lucide-sprite.svg ] && [ ! -f lucide-sprite.svg ]; then
     cp /shared/node_modules/lucide/dist/lucide-sprite.svg ./
     echo "✅ Lucide sprite copied."

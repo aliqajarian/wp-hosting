@@ -33,10 +33,14 @@ for SITE_PATH in "$SITES_DIR"/*; do
         # 2. Update docker-compose.yml (Entrypoint & Memcached)
         echo "    Updating WordPress service in docker-compose.yml..."
         
-        # Force entrypoint to our script to ensure it runs every time
+        # Force entrypoint and command to ensure it runs every time
         if ! grep -q "entrypoint: \[\"/bin/bash\", \"/usr/local/bin/wp-init.sh\"\]" "$SITE_PATH/docker-compose.yml"; then
-            # We insert it after the image: line
-            sed -i '/image: .*-wordpress/a \    entrypoint: ["/bin/bash", "/usr/local/bin/wp-init.sh"]' "$SITE_PATH/docker-compose.yml"
+            # Remove any old entrypoint/command lines if they exist to prevent duplicates
+            sed -i '/    entrypoint:/d' "$SITE_PATH/docker-compose.yml"
+            sed -i '/    command:/d' "$SITE_PATH/docker-compose.yml"
+            
+            # Insert after container_name which is a stable anchor
+            sed -i '/container_name: .*_wp/a \    entrypoint: ["/bin/bash", "/usr/local/bin/wp-init.sh"]\n    command: ["apache2-foreground"]' "$SITE_PATH/docker-compose.yml"
         fi
 
         if ! grep -q "memcached:" "$SITE_PATH/docker-compose.yml"; then
