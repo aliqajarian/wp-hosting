@@ -3,7 +3,7 @@ services:
   # [STANDARD] TRAEFIK GATEWAY (Rules Traffic + SSL)
   # ==========================================
   traefik:
-    image: traefik:v2.10
+    image: traefik:v3.3
     container_name: shared_gateway
     command:
       - "--api.insecure=true"

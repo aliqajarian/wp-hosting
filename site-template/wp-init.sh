@@ -74,11 +74,11 @@ fi
 if [ ! -f /var/www/html/.lang-installed ] && [ -f /usr/local/bin/wp ]; then
     (
         # Wait for DB to be potentially ready (polite wait)
-        sleep 10
+        sleep 2
         
-        # Loop until DB is actually ready (max 30 attempts = 2.5 mins)
+        # Loop until DB is actually ready (max 60 attempts = 1 min)
         echo "[WP-HOSTING] Waiting for Database connection..."
-        for i in {1..30}; do
+        for i in {1..60}; do
             if wp db check --allow-root > /dev/null 2>&1; then
                 echo "[WP-HOSTING] Database Connected! Fixing Permalinks and Language..."
                 wp rewrite structure '/%postname%/' --allow-root
@@ -90,8 +90,8 @@ if [ ! -f /var/www/html/.lang-installed ] && [ -f /usr/local/bin/wp ]; then
                 fi
                 break
             fi
-            echo "[WP-HOSTING] DB not ready yet... (Attempt $i/30)"
-            sleep 5
+            echo "[WP-HOSTING] DB not ready yet... (Attempt $i/60)"
+            sleep 1
         done
     ) &
 fi
