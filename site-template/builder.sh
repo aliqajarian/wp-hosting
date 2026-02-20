@@ -33,15 +33,11 @@ else
 fi
 
 # 4. Start Tailwind Watcher (Offline Mode)
-# Smarter search for Tailwind CLI
+# Smarter search for Tailwind CLI (POSIX compliant)
 TAILWIND_CLI=""
-POSSIBLE_PATHS=(
-    "/shared/node_modules/.bin/tailwindcss"
-    "/shared/node_modules/tailwindcss/lib/cli.js"
-    "/shared/node_modules/tailwindcss/bin/tailwindcss"
-)
-
-for path in "${POSSIBLE_PATHS[@]}"; do
+for path in "/shared/node_modules/.bin/tailwindcss" \
+            "/shared/node_modules/tailwindcss/lib/cli.js" \
+            "/shared/node_modules/tailwindcss/bin/tailwindcss"; do
     if [ -f "$path" ]; then
         TAILWIND_CLI="$path"
         break
@@ -55,14 +51,16 @@ if [ -f "/var/www/html/input.css" ]; then
         echo "   Target: $OUTPUT_PATH"
         
         # Check if it's a JS file or binary
-        if [[ "$TAILWIND_CLI" == *.js ]]; then
-            node "$TAILWIND_CLI" -i /var/www/html/input.css -o "$OUTPUT_PATH" --watch --poll
-        else
-            "$TAILWIND_CLI" -i /var/www/html/input.css -o "$OUTPUT_PATH" --watch --poll
-        fi
+        case "$TAILWIND_CLI" in
+            *.js)
+                node "$TAILWIND_CLI" -i /var/www/html/input.css -o "$OUTPUT_PATH" --watch --poll
+                ;;
+            *)
+                "$TAILWIND_CLI" -i /var/www/html/input.css -o "$OUTPUT_PATH" --watch --poll
+                ;;
+        esac
     else
         echo "❌ ERROR: tailwind cli not found in shared node_modules."
-        echo "Checked: ${POSSIBLE_PATHS[*]}"
         tail -f /dev/null
     fi
 else
