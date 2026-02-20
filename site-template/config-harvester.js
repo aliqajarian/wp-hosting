@@ -6,14 +6,20 @@ function getFiles(dir, allFiles = []) {
     const files = fs.readdirSync(dir);
     for (const file of files) {
         const name = path.join(dir, file);
-        if (fs.statSync(name).isDirectory()) {
-            if (file !== 'node_modules' && file !== 'wp-admin' && file !== 'wp-includes' && file !== '.git') {
-                getFiles(name, allFiles);
+        try {
+            const stats = fs.statSync(name);
+            if (stats.isDirectory()) {
+                if (file !== 'node_modules' && file !== 'wp-admin' && file !== 'wp-includes' && file !== '.git') {
+                    getFiles(name, allFiles);
+                }
+            } else {
+                if (name.endsWith('.php') || name.endsWith('.html') || name.endsWith('.js')) {
+                    allFiles.push(name);
+                }
             }
-        } else {
-            if (name.endsWith('.php') || name.endsWith('.html') || name.endsWith('.js')) {
-                allFiles.push(name);
-            }
+        } catch (e) {
+            // Skip broken symlinks or inaccessible files
+            console.warn(`⚠️ Skipping inaccessible file: ${name}`);
         }
     }
     return allFiles;

@@ -24,10 +24,17 @@ if [ -f /shared/node_modules/lucide/dist/umd/lucide.min.js ] && [ ! -f /var/www/
 fi
 
 # 3. Start Tailwind Watcher (Direct Path - No Internet!)
-TAILWIND_BIN="/shared/bin/tailwindcss"
+TAILWIND_BIN=""
+if [ -f "/shared/bin/tailwindcss" ]; then
+    TAILWIND_BIN="/shared/bin/tailwindcss"
+elif [ -f "/shared/node_modules/.bin/tailwindcss" ]; then
+    TAILWIND_BIN="/shared/node_modules/.bin/tailwindcss"
+fi
+
 if [ -f "/var/www/html/input.css" ]; then
-    if [ -f "$TAILWIND_BIN" ]; then
+    if [ -n "$TAILWIND_BIN" ] && [ -x "$TAILWIND_BIN" ]; then
         echo "🚀 Starting Tailwind watcher (Offline Mode)..."
+        echo "   Using binary: $TAILWIND_BIN"
         "$TAILWIND_BIN" -i /var/www/html/input.css -o /var/www/html/output.css --watch --poll
     else
         echo "❌ ERROR: tailwindcss binary not found at $TAILWIND_BIN"
