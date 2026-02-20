@@ -27,12 +27,17 @@ function getFiles(dir, allFiles = []) {
 
 function harvestConfigs() {
     const siteDir = '/var/www/html';
+    const scanDir = '/var/www/html/wp-content';
     let mergedTheme = { extend: { colors: {}, fontFamily: {} } };
 
     try {
-        console.log("--> Scanning site for custom tailwind configs...");
+        console.log("--> Scanning wp-content for custom tailwind configs...");
         const files = [];
-        getFiles(siteDir, files);
+        if (fs.existsSync(scanDir)) {
+            getFiles(scanDir, files);
+        } else {
+            getFiles(siteDir, files);
+        }
 
         files.forEach(file => {
             const content = fs.readFileSync(file, 'utf8');

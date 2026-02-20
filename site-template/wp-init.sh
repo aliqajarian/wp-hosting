@@ -80,7 +80,9 @@ if [ ! -f /var/www/html/.lang-installed ] && [ -f /usr/local/bin/wp ]; then
         echo "[WP-HOSTING] Waiting for Database connection..."
         for i in {1..30}; do
             if wp db check --allow-root > /dev/null 2>&1; then
-                echo "[WP-HOSTING] Database Connected! Installing Persian language..."
+                echo "[WP-HOSTING] Database Connected! Fixing Permalinks and Language..."
+                wp rewrite structure '/%postname%/' --allow-root
+                wp rewrite flush --allow-root
                 wp language core install fa_IR --activate --allow-root 2>/dev/null
                 if [ $? -eq 0 ]; then
                     touch /var/www/html/.lang-installed
