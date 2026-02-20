@@ -24,9 +24,9 @@ if [ -f /shared/node_modules/lucide/dist/umd/lucide.min.js ] && [ ! -f /var/www/
 fi
 
 # 3. Start Tailwind Watcher (Direct Path - No Internet!)
-TAILWIND_BIN="/shared/node_modules/.bin/tailwindcss"
+TAILWIND_BIN="/shared/bin/tailwindcss"
 if [ -f "/var/www/html/input.css" ]; then
-    if [ -x "$TAILWIND_BIN" ]; then
+    if [ -f "$TAILWIND_BIN" ]; then
         echo "🚀 Starting Tailwind watcher (Offline Mode)..."
         "$TAILWIND_BIN" -i /var/www/html/input.css -o /var/www/html/output.css --watch --poll
     else
