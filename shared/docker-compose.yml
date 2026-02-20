@@ -168,17 +168,14 @@ services:
       - http_proxy=${HTTP_PROXY}
       - https_proxy=${HTTPS_PROXY}
     command: >
-      sh -c " echo 'Setting up shared dependencies (Local Mirror Priority)...' && yarn config set strict-ssl false && yarn config set network-timeout 1000000 && cd /shared && (echo '🚀 Phase 1: Trying Iranian Mirror (Direct)...' && 
-       yarn config set registry http://npm.iranserver.com && 
-       yarn add tailwindcss lucide google-fonts-downloader --verbose) || 
-      (echo '🚀 Phase 2: Trying Global Mirror (NpmMirror)...' && 
-       yarn config set registry http://registry.npmmirror.com && 
-       yarn add tailwindcss lucide google-fonts-downloader --verbose) ||
-      (echo '🚀 Phase 3: Falling back to Proxy-enabled install...' &&
+      sh -c " echo 'Setting up shared dependencies (Multi-Mirror Resilience)...' && yarn config set strict-ssl false && yarn config set network-timeout 1000000 && cd /shared &&
+
+      # 🚀 Try Iranian Mirror 1 (echo '🚀 Phase 1: Trying Iranserver...' && yarn config set registry http://npm.iranserver.com && yarn add tailwindcss lucide google-fonts-downloader --verbose) ||  # 🚀 Try Iranian Mirror 2 (echo '🚀 Phase 2: Trying NpmJS.ir...' && yarn config set registry https://registry.npmjs.ir && yarn add tailwindcss lucide google-fonts-downloader --verbose) ||  # 🚀 Try Global Mirror (China) (echo '🚀 Phase 3: Trying NpmMirror...' && yarn config set registry http://registry.npmmirror.com && yarn add tailwindcss lucide google-fonts-downloader --verbose) || # 🚀 Final Fallback (Proxy) (echo '🚀 Phase 4: Final fallback with Proxy...' &&
        yarn config set proxy \"$HTTPS_PROXY\" &&
        yarn config set https-proxy \"$HTTPS_PROXY\" &&
        yarn add tailwindcss lucide google-fonts-downloader --verbose) &&
-      echo '✅ Dependencies installed.' && tail -f /dev/null"
+
+      echo '✅ Dependencies installed successfully.' && tail -f /dev/null"
     network_mode: host
     # networks:
     #   - wp_shared_net
