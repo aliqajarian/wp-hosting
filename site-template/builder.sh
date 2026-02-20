@@ -23,19 +23,28 @@ if [ -f /shared/node_modules/lucide/dist/umd/lucide.min.js ] && [ ! -f /var/www/
     echo "✅ Lucide JS copied."
 fi
 
-# 3. Start Tailwind Watcher (Offline Mode)
+# 3. Find Theme Directory (where output.css should live)
+THEME_DIR=$(find /var/www/html/wp-content/themes -maxdepth 1 -mindepth 1 -type d | head -n 1)
+if [ -z "$THEME_DIR" ]; then
+    echo "⚠️ No theme found in wp-content/themes. Falling back to site root."
+    OUTPUT_PATH="/var/www/html/output.css"
+else
+    OUTPUT_PATH="$THEME_DIR/output.css"
+fi
+
+# 4. Start Tailwind Watcher (Offline Mode)
 TAILWIND_BIN="/shared/node_modules/.bin/tailwindcss"
 if [ -f "/var/www/html/input.css" ]; then
     if [ -f "$TAILWIND_BIN" ]; then
         echo "🚀 Starting Tailwind watcher (Offline Mode)..."
-        "$TAILWIND_BIN" -i /var/www/html/input.css -o /var/www/html/output.css --watch --poll
+        echo "   Target: $OUTPUT_PATH"
+        "$TAILWIND_BIN" -i /var/www/html/input.css -o "$OUTPUT_PATH" --watch --poll
     else
         echo "❌ ERROR: tailwindcss binary not found at $TAILWIND_BIN"
-        echo "Please run Opt 10 or check shared_deps container."
+        echo "Please ensure you sideloaded node_modules to /shared/node_modules"
         tail -f /dev/null
     fi
 else
-    echo "⚠️ No input.css found in /var/www/html/. Create one to start Tailwind compilation."
-    echo "Waiting for assets..."
+    echo "⚠️ No input.css found. Create one to start Tailwind compilation."
     tail -f /dev/null
 fi

@@ -69,7 +69,7 @@ for SITE_PATH in "$SITES_DIR"/*; do
     working_dir: /var/www/html
     volumes:
       - ./:/var/www/html
-      - shared_node_modules:/shared/node_modules
+      - /opt/wp-hosting/shared/node_modules:/shared/node_modules
     environment:
       - NODE_PATH=/shared/node_modules
       - PATH=/shared/node_modules/.bin:\${PATH}
@@ -84,14 +84,8 @@ EOF
         sed -i '/#BUILDER_INJECTION_POINT/d' "$SITE_PATH/docker-compose.yml"
         rm /tmp/builder_block.yml
         
-        # Add shared_node_modules volume registration if missing
-        if ! grep -q "shared_node_modules:" "$SITE_PATH/docker-compose.yml"; then
-            if grep -q "^volumes:" "$SITE_PATH/docker-compose.yml"; then
-                # Append to end of volumes block safely
-                sed -i '/^volumes:/a \  shared_node_modules:\n    external: true' "$SITE_PATH/docker-compose.yml"
-            else
-                echo -e "\nvolumes:\n  db_data:\n  shared_node_modules:\n    external: true" >> "$SITE_PATH/docker-compose.yml"
-            fi
+        if ! grep -q "^volumes:" "$SITE_PATH/docker-compose.yml"; then
+            echo -e "\nvolumes:\n  db_data:" >> "$SITE_PATH/docker-compose.yml"
         fi
 
         # 4. Copy Assets, Scripts & Fonts
@@ -118,17 +112,7 @@ EOF
         echo "    Updating containers..."
         cd "$SITE_PATH"
         
-        # Only build if Dockerfile is different from what was previously used
-        # We check if the image exists. If it doesn't, or if we want to be safe, we build.
-        # But we remove --no-cache to use Docker layering.
-        if [[ "$(docker images -q ${SITE_NAME}-wordpress 2> /dev/null)" == "" ]]; then
-            echo "    Initial build for $SITE_NAME..."
-            docker compose build
-        else
-            # Check if Dockerfile was actually updated by comparing checksums (optional but faster)
-            docker compose build
-        fi
-        
+        # Skip build to save time (only up -d)
         docker compose up -d --remove-orphans
         cd "$BASE_DIR"
         

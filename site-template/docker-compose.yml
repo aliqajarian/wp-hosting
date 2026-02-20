@@ -92,7 +92,7 @@ services:
     working_dir: /var/www/html
     volumes:
       - ./:/var/www/html
-      - shared_node_modules:/shared/node_modules
+      - /opt/wp-hosting/shared/node_modules:/shared/node_modules
     environment:
       - NODE_PATH=/shared/node_modules
       - PATH=/shared/node_modules/.bin:${PATH}
@@ -110,5 +110,3 @@ networks:
 
 volumes:
   db_data:
-  shared_node_modules:
-    external: true
