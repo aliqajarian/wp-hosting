@@ -8,9 +8,8 @@ try {
 
 module.exports = {
     content: [
-        './wp-content/themes/**/*.php',
-        './wp-content/themes/**/*.html',
-        './wp-content/themes/**/*.js',
+        './wp-content/**/*.{php,html,js}',
+        './*.{php,html,js}',
     ],
     theme: {
         extend: {

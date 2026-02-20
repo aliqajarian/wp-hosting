@@ -13,7 +13,7 @@ function getFiles(dir, allFiles = []) {
                     getFiles(name, allFiles);
                 }
             } else {
-                if (name.endsWith('.php') || name.endsWith('.html') || name.endsWith('.js')) {
+                if (name.endsWith('.php') || name.endsWith('.html') || name.endsWith('.js') || name.endsWith('.tailwind.json')) {
                     allFiles.push(name);
                 }
             }
@@ -40,13 +40,29 @@ function harvestConfigs() {
         }
 
         files.forEach(file => {
+            // Support for standalone .tailwind.json files
+            if (file.endsWith('.tailwind.json')) {
+                try {
+                    const config = JSON.parse(fs.readFileSync(file, 'utf8'));
+                    if (config.theme && config.theme.extend) {
+                        Object.assign(mergedTheme.extend.colors, config.theme.extend.colors || {});
+                        Object.assign(mergedTheme.extend.fontFamily, config.theme.extend.fontFamily || {});
+                    }
+                } catch (e) {
+                    console.warn(`⚠️ Failed to parse JSON config: ${file}`);
+                }
+                return;
+            }
+
+            // Support for embedded tailwind.config = { ... } blocks
             const content = fs.readFileSync(file, 'utf8');
-            const regex = /tailwind\.config\s*=\s*({[\s\S]*?});/g;
+            const regex = /tailwind\.config\s*=\s*({[\s\S]*?})(?=;|\s|$)/g;
             let match;
 
             while ((match = regex.exec(content)) !== null) {
                 try {
                     let configStr = match[1]
+                        // Simple cleanup to handle basic JS objects as JSON
                         .replace(/(['"])?([a-zA-Z0-9_]+)(['"])?:/g, '"$2":')
                         .replace(/'/g, '"')
                         .replace(/,\s*}/g, '}')
