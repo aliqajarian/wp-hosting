@@ -23,7 +23,7 @@ if [ -f /shared/node_modules/lucide/dist/umd/lucide.min.js ] && [ ! -f /var/www/
     echo "✅ Lucide JS copied."
 fi
 
-# 3. Start Tailwind Watcher (Direct Path - No Internet!)
+# 3. Start Tailwind Watcher (Offline Mode)
 TAILWIND_BIN="/shared/node_modules/.bin/tailwindcss"
 if [ -f "/var/www/html/input.css" ]; then
     if [ -f "$TAILWIND_BIN" ]; then

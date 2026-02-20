@@ -11,13 +11,10 @@ services:
       - "--providers.docker.exposedbydefault=false"
       - "--entrypoints.web.address=:80"
       - "--entrypoints.websecure.address=:443"
-      # Global Redirect to HTTPS
       - "--entrypoints.web.http.redirections.entryPoint.to=websecure"
       - "--entrypoints.web.http.redirections.entryPoint.scheme=https"
-      # SSL Resolver (Let's Encrypt - HTTP Challenge)
       - "--certificatesresolvers.myresolver.acme.httpchallenge=true"
       - "--certificatesresolvers.myresolver.acme.httpchallenge.entrypoint=web"
-      # - "--certificatesresolvers.myresolver.acme.caserver=https://acme-staging-v02.api.letsencrypt.org/directory" # Uncomment for testing
       - "--certificatesresolvers.myresolver.acme.email=admin@yourdomain.com"
       - "--certificatesresolvers.myresolver.acme.storage=/letsencrypt/acme.json"
     ports:
@@ -34,14 +31,13 @@ services:
   # ==========================================
   # [NEW] WEB FILE MANAGER (FileBrowser)
   # ==========================================
-  # Manage all site files from your browser. No FTP needed.
   filebrowser:
     image: filebrowser/filebrowser:latest
     container_name: shared_filebrowser
-    user: "0:0" # Run as root to access all site folders
+    user: "0:0"
     volumes:
-      - ../sites:/srv # Mount all sites
-      - filebrowser_db:/database # Store users/settings
+      - ../sites:/srv
+      - filebrowser_db:/database
     labels:
       - "traefik.enable=true"
       - "traefik.http.routers.files.rule=Host(`files.localhost`)"
@@ -55,7 +51,6 @@ services:
   # ==========================================
   # [NEW] EMAIL CATCHER (Mailpit)
   # ==========================================
-  # Captures emails sent by WordPress for debugging
   mailpit:
     image: axllent/mailpit
     container_name: shared_mailpit
@@ -160,25 +155,10 @@ services:
     image: node:lts-alpine
     container_name: shared_deps
     volumes:
-      - shared_node_modules:/shared/node_modules
+      - ./node_modules:/shared/node_modules
     working_dir: /shared
-    environment:
-      - HTTP_PROXY=${HTTP_PROXY}
-      - HTTPS_PROXY=${HTTPS_PROXY}
-      - http_proxy=${HTTP_PROXY}
-      - https_proxy=${HTTPS_PROXY}
-    command: >
-      sh -c " echo 'Setting up shared dependencies (Multi-Mirror Resilience)...' && yarn config set strict-ssl false && yarn config set network-timeout 1000000 && cd /shared &&
-
-      # 🚀 Try Iranian Mirror 1 (echo '🚀 Phase 1: Trying Iranserver...' && yarn config set registry http://npm.iranserver.com && yarn add tailwindcss lucide google-fonts-downloader --verbose) ||  # 🚀 Try Iranian Mirror 2 (echo '🚀 Phase 2: Trying NpmJS.ir...' && yarn config set registry https://registry.npmjs.ir && yarn add tailwindcss lucide google-fonts-downloader --verbose) ||  # 🚀 Try Global Mirror (China) (echo '🚀 Phase 3: Trying NpmMirror...' && yarn config set registry http://registry.npmmirror.com && yarn add tailwindcss lucide google-fonts-downloader --verbose) || # 🚀 Final Fallback (Proxy) (echo '🚀 Phase 4: Final fallback with Proxy...' &&
-       yarn config set proxy \"$HTTPS_PROXY\" &&
-       yarn config set https-proxy \"$HTTPS_PROXY\" &&
-       yarn add tailwindcss lucide google-fonts-downloader --verbose) &&
-
-      echo '✅ Dependencies installed successfully.' && tail -f /dev/null"
+    command: sh -c "echo 'Shared tools ready' && tail -f /dev/null"
     network_mode: host
-    # networks:
-    #   - wp_shared_net
 
 networks:
   wp_shared_net:
@@ -186,8 +166,6 @@ networks:
     driver: bridge
 
 volumes:
-  shared_node_modules:
-    name: shared_node_modules
   netdata_config:
   netdata_lib:
   netdata_cache:
