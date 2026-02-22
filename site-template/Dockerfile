@@ -3,9 +3,11 @@
 # ==========================================
 FROM wordpress:latest
 
-# We removed the external php-extension-installer because it was 
-# being blocked by Docker Hub (403 Forbidden).
-# IonCube and other tools are now handled in wp-init.sh at runtime.
+# Install system dependencies for SOAP
+RUN apt-get update && apt-get install -y \
+    libxml2-dev \
+    && docker-php-ext-install soap \
+    && apt-get clean && rm -rf /var/lib/apt/lists/*
 
 # Copy our custom initialization script
 COPY wp-init.sh /usr/local/bin/wp-init.sh

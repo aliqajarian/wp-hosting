@@ -22,12 +22,16 @@ echo -e "${BLUE}==========================================${NC}"
 
 # Inputs
 read -p "1. Enter New Site Name (folder, e.g. client_x): " SITE_NAME
-read -p "2. Enter New Domain Name (e.g. newsite.com): " DOMAIN_NAME
-read -p "3. Path to Source Files Directory (e.g. /tmp/old_files): " SRC_FILES
-read -p "4. Path to SQL Dump File (e.g. /tmp/backup.sql): " SQP_PATH
+read -p "2. Enter New Domain (e.g. newsite.com - without http): " DOMAIN_NAME
+read -p "3. Path to Source Files Directory on Host: " SRC_FILES
+read -p "4. Path to SQL Dump File on Host: " SQP_PATH
 read -p "5. Enter Old Domain to Replace (e.g. oldsite.com): " OLD_DOMAIN
 read -s -p "6. Set SFTP/System Password: " SITE_PASS
 echo ""
+
+# Guidance: If user entered domain with http, strip it for consistent search-replace
+NEW_DOMAIN_CLEAN=$(echo "$DOMAIN_NAME" | sed -e 's|^https\?://||' -e 's|/$||')
+OLD_DOMAIN_CLEAN=$(echo "$OLD_DOMAIN" | sed -e 's|^https\?://||' -e 's|/$||')
 
 # Validation
 if [ ! -d "$SRC_FILES" ]; then
@@ -94,9 +98,15 @@ echo -e "${GREEN}>>> Step 4: Updating URLs in database...${NC}"
 WP_CONTAINER="${SITE_NAME}_wp"
 
 # Perform search-replace via WP-CLI inside the container
-docker exec -u 1001 "$WP_CONTAINER" wp search-replace "$OLD_DOMAIN" "$DOMAIN_NAME" --allow-root
+# We use --all-tables and --precise to ensure everything is covered
+docker exec -u 1001 "$WP_CONTAINER" wp search-replace "$OLD_DOMAIN_CLEAN" "$NEW_DOMAIN_CLEAN" --all-tables --allow-root
 
-echo -e "${GREEN}>>> Step 5: Finalizing...${NC}"
+# Step 5: Fix wp-config.php (Database Host)
+echo "    Ensuring wp-config.php uses the internal Docker DB host..."
+docker exec -u 1001 "$WP_CONTAINER" sed -i "s/define( *'DB_HOST', *'[^']*' *)/define('DB_HOST', 'db')/g" wp-config.php 2>/dev/null
+docker exec -u 1001 "$WP_CONTAINER" sed -i "s/define( *\"DB_HOST\", *\"[^\"]*\" *)/define(\"DB_HOST\", \"db\")/g" wp-config.php 2>/dev/null
+
+echo -e "${GREEN}>>> Step 6: Finalizing...${NC}"
 # Flush cache if object cache is active
 docker exec -u 1001 "$WP_CONTAINER" wp cache flush --allow-root 2>/dev/null
 
