@@ -50,7 +50,7 @@ services:
       - "traefik.enable=true"
       - "traefik.http.routers.files.rule=Host(`files.localhost`) || Host(`files.${DOMAIN_NAME:-localhost}`)"
       - "traefik.http.routers.files.entrypoints=websecure"
-      - "traefik.http.routers.files.tls.certresolver=myresolver"
+      - "traefik.http.routers.files.tls=true"
     networks:
       - wp_shared_net
     healthcheck:
@@ -72,7 +72,7 @@ services:
       - "traefik.enable=true"
       - "traefik.http.routers.pma.rule=Host(`pma.localhost`) || Host(`pma.${DOMAIN_NAME:-localhost}`)"
       - "traefik.http.routers.pma.entrypoints=websecure"
-      - "traefik.http.routers.pma.tls.certresolver=myresolver"
+      - "traefik.http.routers.pma.tls=true"
     networks:
       - wp_shared_net
     restart: unless-stopped
@@ -90,7 +90,7 @@ services:
       - "traefik.enable=true"
       - "traefik.http.routers.mail.rule=Host(`mail.localhost`) || Host(`mail.${DOMAIN_NAME:-localhost}`)"
       - "traefik.http.routers.mail.entrypoints=websecure"
-      - "traefik.http.routers.mail.tls.certresolver=myresolver"
+      - "traefik.http.routers.mail.tls=true"
       - "traefik.http.services.mail.loadbalancer.server.port=8025"
 
     networks:
