@@ -52,6 +52,9 @@ services:
       - "traefik.http.routers.files.tls.certresolver=myresolver"
     networks:
       - wp_shared_net
+    healthcheck:
+      test: [ "CMD", "/healthcheck.sh" ]
+      interval: 2m
     restart: unless-stopped
 
   # ==========================================
@@ -93,7 +96,7 @@ services:
     restart: unless-stopped
 
   # ==========================================
-  # [NEW] SHARED DEPENDENCIES PROVIDER (For Offline Builds)
+  # [NEW] SHARED DEPENDENCIES PROVIDER
   # ==========================================
   shared_deps_provider:
     image: node:lts-alpine
@@ -106,7 +109,7 @@ services:
     restart: unless-stopped
 
   # ==========================================
-  # [NEW] PORTAINER AGENT (Management)
+  # [NEW] PORTAINER AGENT
   # ==========================================
   portainer_agent:
     image: portainer/agent:latest
@@ -135,33 +138,32 @@ services:
       - "22000:22000/udp"
       - "21027:21027/udp"
     restart: unless-stopped
-
   # ==========================================
-  # [NEW] NETDATA (Monitoring)
+  # [NEW] NETDATA (COMMMENTED OUT TO SAVE CPU)
   # ==========================================
-  netdata:
-    image: netdata/netdata
-    container_name: shared_netdata
-    pid: host
-    network_mode: host
-    restart: unless-stopped
-    cap_add:
-      - SYS_PTRACE
-      - SYS_ADMIN
-    security_opt:
-      - apparmor:unconfined
-    volumes:
-      - netdataconfig:/etc/netdata
-      - netdatalib:/var/lib/netdata
-      - netdatacache:/var/cache/netdata
-      - /:/host/root:ro,rslave
-      - /etc/passwd:/host/etc/passwd:ro
-      - /etc/group:/host/etc/group:ro
-      - /proc:/host/proc:ro
-      - /sys:/host/sys:ro
-      - /etc/os-release:/host/etc/os-release:ro
-      - /var/log:/host/var/log:ro
-      - /var/run/docker.sock:/var/run/docker.sock:ro
+  # netdata:
+  #   image: netdata/netdata
+  #   container_name: shared_netdata
+  #   pid: host
+  #   network_mode: host
+  #   restart: unless-stopped
+  #   cap_add:
+  #     - SYS_PTRACE
+  #     - SYS_ADMIN
+  #   security_opt:
+  #     - apparmor:unconfined
+  #   volumes:
+  #     - netdataconfig:/etc/netdata
+  #     - netdatalib:/var/lib/netdata
+  #     - netdatacache:/var/cache/netdata
+  #     - /:/host/root:ro,rslave
+  #     - /etc/passwd:/host/etc/passwd:ro
+  #     - /etc/group:/host/etc/group:ro
+  #     - /proc:/host/proc:ro
+  #     - /sys:/host/sys:ro
+  #     - /etc/os-release:/host/etc/os-release:ro
+  #     - /var/log:/host/var/log:ro
+  #     - /var/run/docker.sock:/var/run/docker.sock:ro
 
 networks:
   wp_shared_net:
