@@ -21,32 +21,47 @@ echo -e "${BLUE}      WORDPRESS MIGRATION WIZARD          ${NC}"
 echo -e "${BLUE}==========================================${NC}"
 
 # Inputs
-read -p "1. Enter New Site Name (folder, e.g. client_x): " SITE_NAME
-read -p "2. Enter New Domain (e.g. newsite.com - without http): " DOMAIN_NAME
-read -p "3. Path to Source Files Directory on Host: " SRC_FILES
-read -p "4. Path to SQL Dump File on Host: " SQP_PATH
-read -p "5. Enter Old Domain to Replace (e.g. oldsite.com): " OLD_DOMAIN
-read -s -p "6. Set SFTP/System Password: " SITE_PASS
-echo ""
+echo -e "${CYAN}--- Please provide the following details ---${NC}"
 
-# Guidance: If user entered domain with http, strip it for consistent search-replace
+# Clear any trailing input
+read -t 1 -n 10000 DISCARD 2>/dev/null
+
+read -p "1. Enter New Site Name (folder, e.g. client_x): " SITE_NAME
+if [ -z "$SITE_NAME" ]; then echo -e "${RED}Error: Site name is required.${NC}"; exit 1; fi
+
+read -p "2. Enter New Domain (e.g. newsite.com): " DOMAIN_NAME
+if [ -z "$DOMAIN_NAME" ]; then echo -e "${RED}Error: Domain is required.${NC}"; exit 1; fi
+
+read -p "3. Path to Source Files Directory (contains wp-content): " SRC_FILES
+if [ -z "$SRC_FILES" ]; then echo -e "${RED}Error: Source path is required.${NC}"; exit 1; fi
+
+read -p "4. Path to SQL Dump File (.sql): " SQP_PATH
+if [ -z "$SQP_PATH" ]; then echo -e "${RED}Error: SQL path is required.${NC}"; exit 1; fi
+
+read -p "5. Enter Old Domain to Replace: " OLD_DOMAIN
+if [ -z "$OLD_DOMAIN" ]; then echo -e "${RED}Error: Old domain is required.${NC}"; exit 1; fi
+
+read -s -p "6. Set SFTP/System Password: " SITE_PASS
+echo -e "\n------------------------------------------"
+
+# Define paths and IDs
+SITE_DIR="$BASE_DIR/sites/$SITE_NAME"
+WP_CONTAINER="${SITE_NAME}_wp"
+
+# Guidance: Clean domains
 NEW_DOMAIN_CLEAN=$(echo "$DOMAIN_NAME" | sed -e 's|^https\?://||' -e 's|/$||')
 OLD_DOMAIN_CLEAN=$(echo "$OLD_DOMAIN" | sed -e 's|^https\?://||' -e 's|/$||')
 
 # Validation
 if [ ! -d "$SRC_FILES" ]; then
-    echo -e "${RED}[ERROR] Source directory not found: $SRC_FILES${NC}"
+    echo -e "${RED}[ERROR] Source directory not found at: $SRC_FILES${NC}"
     exit 1
 fi
 
 if [ ! -f "$SQP_PATH" ]; then
-    echo -e "${RED}[ERROR] SQL file not found: $SQP_PATH${NC}"
+    echo -e "${RED}[ERROR] SQL file not found at: $SQP_PATH${NC}"
     exit 1
 fi
-
-# Define paths and IDs
-SITE_DIR="$BASE_DIR/sites/$SITE_NAME"
-WP_CONTAINER="${SITE_NAME}_wp"
 
 # Step 1: Create the Site Infrastructure
 echo -e "${GREEN}>>> Step 1: Creating base site containers...${NC}"
