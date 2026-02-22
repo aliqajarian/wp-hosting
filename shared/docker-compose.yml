@@ -56,7 +56,7 @@ services:
     healthcheck:
       test: [ "CMD", "/healthcheck.sh" ]
       interval: 2m
-      restart: unless-stopped
+    restart: unless-stopped
 
   # ==========================================
   # [NEW] PHPMYADMIN (Database GUI)
