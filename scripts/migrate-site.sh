@@ -56,17 +56,19 @@ if [ $? -ne 0 ]; then
     exit 1
 fi
 
-SITE_DIR="$BASE_DIR/sites/$SITE_NAME"
-WP_CONTAINER="${SITE_NAME}_wp"
-
 # Detect table prefix from source wp-config.php
 TABLE_PREFIX="wp_"
 if [ -f "$SRC_FILES/wp-config.php" ]; then
-    DETECTED_PREFIX=$(grep "\$table_prefix" "$SRC_FILES/wp-config.php" | grep -v "//" | cut -d"'" -f2 | cut -d'"' -f2)
+    DETECTED_PREFIX=$(sed -n "s/.*\$table_prefix *= *['\"]\(.*\)['\"];.*/\1/p" "$SRC_FILES/wp-config.php" | head -n 1)
     if [ -n "$DETECTED_PREFIX" ] && [ "$DETECTED_PREFIX" != "wp_" ]; then
         TABLE_PREFIX=$DETECTED_PREFIX
         echo -e "${CYAN}    Detected custom table prefix: $TABLE_PREFIX${NC}"
-        echo "WORDPRESS_TABLE_PREFIX=$TABLE_PREFIX" >> "$SITE_DIR/.env"
+        # Use sed to replace or append
+        if grep -q "WORDPRESS_TABLE_PREFIX" "$SITE_DIR/.env"; then
+            sed -i "s/WORDPRESS_TABLE_PREFIX=.*/WORDPRESS_TABLE_PREFIX=$TABLE_PREFIX/" "$SITE_DIR/.env"
+        else
+            echo "WORDPRESS_TABLE_PREFIX=$TABLE_PREFIX" >> "$SITE_DIR/.env"
+        fi
         echo "    Updating container to use custom prefix..."
         cd "$SITE_DIR" && docker compose up -d --force-recreate
     fi
@@ -74,6 +76,10 @@ fi
 
 # Step 2: Copy Content
 echo -e "${GREEN}>>> Step 2: Migrating wp-content and assets...${NC}"
+
+# STOP container to prevent it from regenerating files while we copy
+echo "    Pausing WordPress container for file migration..."
+docker stop "$WP_CONTAINER" >/dev/null
 
 # We remove the "fresh" wp-content to avoid conflicts
 rm -rf "$SITE_DIR/wp-content"
@@ -85,6 +91,10 @@ else
     echo -e "${RED}[WARN] wp-content not found in source directory. Copying everything else...${NC}"
     cp -r "$SRC_FILES/"* "$SITE_DIR/"
 fi
+
+# START container back
+docker start "$WP_CONTAINER" >/dev/null
+echo "    WordPress container resumed."
 
 # Fix ownership (Now that we run as root in container, host should match SYS_UID)
 chown -R 1001:1001 "$SITE_DIR"
@@ -124,19 +134,32 @@ echo -e "${GREEN}>>> Step 4: Updating URLs in database...${NC}"
 # Wait for WP-CLI to be ready inside the container (wp-init.sh might be downloading it)
 echo "    Waiting for WP-CLI to be ready..."
 for i in {1..60}; do
-    if docker exec "$WP_CONTAINER" command -v wp >/dev/null 2>&1; then
+    # Check if command exists OR if files exist in known locations
+    if docker exec "$WP_CONTAINER" command -v wp >/dev/null 2>&1 || \
+       docker exec "$WP_CONTAINER" [ -f /usr/local/bin/wp ] || \
+       docker exec "$WP_CONTAINER" [ -f /tmp/wp ]; then
         break
     fi
     [ $((i % 5)) -eq 0 ] && echo "    ...still waiting for WP-CLI ($i/60)"
     sleep 2
 done
 
+# Define WP_CMD to Use inside docker exec
+WP_CMD="wp"
 if ! docker exec "$WP_CONTAINER" command -v wp >/dev/null 2>&1; then
-     echo -e "${RED}[ERROR] WP-CLI is not available. Search & Replace skipped!${NC}"
+    if docker exec "$WP_CONTAINER" [ -f /usr/local/bin/wp ]; then
+        WP_CMD="/usr/local/bin/wp"
+    elif docker exec "$WP_CONTAINER" [ -f /tmp/wp ]; then
+        WP_CMD="/tmp/wp"
+    fi
+fi
+
+if ! docker exec "$WP_CONTAINER" $WP_CMD --version >/dev/null 2>&1; then
+     echo -e "${RED}[ERROR] WP-CLI is not functional. Search & Replace skipped!${NC}"
      echo "        Please run it manually later: docker exec $WP_CONTAINER wp search-replace ..."
 else
     # Perform search-replace
-    docker exec "$WP_CONTAINER" wp search-replace "$OLD_DOMAIN_CLEAN" "$NEW_DOMAIN_CLEAN" --all-tables --allow-root
+    docker exec "$WP_CONTAINER" $WP_CMD search-replace "$OLD_DOMAIN_CLEAN" "$NEW_DOMAIN_CLEAN" --all-tables --allow-root
 fi
 
 # Step 5: Fix wp-config.php (Database Host)

@@ -1,3 +1,12 @@
+#!/bin/bash
+# ==========================================
+# WP-HOSTING ENTRYPOINT
+# ==========================================
+# Installs IonCube, WP-CLI, and Persian language on first boot.
+
+MARKER="/usr/local/etc/.wp-hosting-initialized"
+export PATH=$PATH:/usr/local/bin
+
 # Check if we are running as root
 IS_ROOT=false
 if [ "$(id -u)" = '0' ]; then
@@ -55,37 +64,37 @@ if [ ! -f "$MARKER" ]; then
             cp "$LOCAL_WP_CLI" /tmp/wp && chmod +x /tmp/wp
         fi
     else
-        echo "[WP-HOSTING] Downloading WP-CLI from official source..."
-        if [ "$IS_ROOT" = true ]; then
-            curl -sL --connect-timeout 15 --max-time 60 --retry 3 \
-                -o /usr/local/bin/wp \
-                "https://raw.githubusercontent.com/wp-cli/builds/gh-pages/phar/wp-cli.phar"
+        echo "[WP-HOSTING] Downloading WP-CLI..."
+        # Primary URL and Mirrors
+        URLS=(
+            "https://raw.githubusercontent.com/wp-cli/builds/gh-pages/phar/wp-cli.phar"
+            "https://cdn.jsdelivr.net/gh/wp-cli/builds@gh-pages/phar/wp-cli.phar"
+        )
+        
+        SUCCESS=false
+        for URL in "${URLS[@]}"; do
+            echo "    Trying: $URL"
+            TARGET="/usr/local/bin/wp"
+            [ "$IS_ROOT" != true ] && TARGET="/tmp/wp"
+            
+            if curl -sL --connect-timeout 10 --max-time 120 --retry 2 -o "$TARGET" "$URL"; then
+                chmod +x "$TARGET"
+                SUCCESS=true
+                break
+            fi
+        done
+        
+        if [ "$SUCCESS" = true ]; then
+            echo "[WP-HOSTING] WP-CLI installed successfully!"
         else
-            curl -sL --connect-timeout 15 --max-time 60 --retry 3 \
-                -o /tmp/wp \
-                "https://raw.githubusercontent.com/wp-cli/builds/gh-pages/phar/wp-cli.phar"
+            echo "[WP-HOSTING] ERROR: WP-CLI download failed from all sources."
         fi
     fi
     
-    if [ "$IS_ROOT" = true ] && [ -f /usr/local/bin/wp ]; then
-        chmod +x /usr/local/bin/wp
-        echo "[WP-HOSTING] WP-CLI installed!"
-    elif [ -f /tmp/wp ]; then
-        chmod +x /tmp/wp
-        echo "[WP-HOSTING] WP-CLI installed to /tmp/wp (No root permissions for /usr/local/bin)"
-    else
-        echo "[WP-HOSTING] WP-CLI download failed (will retry next restart)"
-    fi
-
-    # Mark as initialized (only if both succeeded or at least WP-CLI)
-    if [ -f /usr/local/bin/wp ] || [ -f /tmp/wp ]; then
+    # Mark as initialized
+    if command -v wp >/dev/null 2>&1 || [ -f /usr/local/bin/wp ] || [ -f /tmp/wp ]; then
         [ "$IS_ROOT" = true ] && touch "$MARKER"
     fi
-fi
-
-# Ensure /usr/local/bin/wp is available for the next steps
-if [ ! -f /usr/local/bin/wp ] && [ -f /tmp/wp ]; then
-    alias wp='/tmp/wp'
 fi
 
 # --- 3. Adjust User (www-data) to match host SYS_UID/SYS_GID ---
@@ -98,7 +107,7 @@ if [ "$IS_ROOT" = true ] && [ -n "$SYS_UID" ] && [ -n "$SYS_GID" ]; then
 fi
 
 # --- 4. Install Persian language (needs WordPress + DB to be ready) ---
-if [ ! -f /var/www/html/.lang-installed ] && command -v wp >/dev/null; then
+if [ ! -f /var/www/html/.lang-installed ]; then
     (
         # Wait for DB to be potentially ready (polite wait)
         sleep 5
@@ -106,23 +115,23 @@ if [ ! -f /var/www/html/.lang-installed ] && command -v wp >/dev/null; then
         # Loop until DB is actually ready (max 120 attempts = 2 mins)
         echo "[WP-HOSTING] Waiting for Database connection..."
         for i in {1..120}; do
-            if wp db check --allow-root > /dev/null 2>&1; then
-                echo "[WP-HOSTING] Database Connected! Checking if site is installed..."
-                if wp core is-installed --allow-root > /dev/null 2>&1; then
+            # Use absolute path to WP-CLI for background task
+            WP_BIN="/usr/local/bin/wp"
+            [ ! -f "$WP_BIN" ] && WP_BIN="/tmp/wp"
+
+            if [ -f "$WP_BIN" ] && "$WP_BIN" db check --allow-root > /dev/null 2>&1; then
+                if "$WP_BIN" core is-installed --allow-root > /dev/null 2>&1; then
                     echo "[WP-HOSTING] WordPress is installed. Fixing Permalinks and Language..."
-                    wp rewrite structure '/%postname%/' --allow-root
-                    wp rewrite flush --allow-root
-                    wp language core install fa_IR --activate --allow-root 2>/dev/null
+                    "$WP_BIN" rewrite structure '/%postname%/' --allow-root
+                    "$WP_BIN" rewrite flush --allow-root
+                    "$WP_BIN" language core install fa_IR --activate --allow-root 2>/dev/null
                     if [ $? -eq 0 ]; then
                         touch /var/www/html/.lang-installed
                         echo "[WP-HOSTING] Persian language installed successfully!"
                     fi
-                else
-                    echo "[WP-HOSTING] WordPress not installed yet. Skipping language setup for now."
                 fi
                 break
             fi
-            [ $((i % 10)) -eq 0 ] && echo "[WP-HOSTING] DB not ready yet... (Attempt $i/120)"
             sleep 2
         done
     ) &
