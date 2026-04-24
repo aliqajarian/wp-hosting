@@ -36,7 +36,7 @@ BUILD_ARGS=""
 
 # Test international connectivity (Google DNS or official repo)
 # We use a short timeout to fail fast in restricted environments
-if curl -s --connect-timeout 5 https://google.com > /dev/null; then
+if curl -s --connect-timeout 5 https://gemini.google.com > /dev/null; then
     echo -e "    ${GREEN}[GLOBAL] Connectivity confirmed. Using official repositories.${NC}"
 else
     echo -e "    ${YELLOW}[RESTRICTED] International timeout detected. Switching to Iranian mirrors...${NC}"
