@@ -29,46 +29,30 @@ fi
 
 echo ">>> Creating site $SITE_NAME ($DOMAIN_NAME)..."
 
-# 1. Location Detection (Smart Mirror)
-echo ">>> Checking location for optimal mirrors..."
-if [ "$FORCE_IR" == "true" ]; then
-    COUNTRY="IR"
-else
-    # Try multiple services in case one is blocked
-    COUNTRY=$(curl -s --connect-timeout 3 http://ip-api.com/line?fields=countryCode || \
-              curl -s --connect-timeout 3 https://ipapi.co/country/ || \
-              echo "UNKNOWN")
-fi
-
+# 1. Connectivity Check & Mirror Selection
+echo -e "${CYAN}[1/7] Checking network connectivity...${NC}"
+MIRROR=""
 BUILD_ARGS=""
-if [ "$COUNTRY" == "IR" ] || [ "$COUNTRY" == "Iran" ] || [ "$COUNTRY" == "UNKNOWN" ]; then
-    echo "    [DETECTED: IRAN/RESTRICTED] Setting up Iranian mirrors for build..."
-    BUILD_ARGS="--build-arg MIRROR=mirror.arvancloud.ir"
+
+# Test international connectivity (Google DNS or official repo)
+# We use a short timeout to fail fast in restricted environments
+if curl -s --connect-timeout 5 https://google.com > /dev/null; then
+    echo -e "    ${GREEN}[GLOBAL] Connectivity confirmed. Using official repositories.${NC}"
 else
-    echo "    [DETECTED: GLOBAL] Using official repositories."
+    echo -e "    ${YELLOW}[RESTRICTED] International timeout detected. Switching to Iranian mirrors...${NC}"
+    MIRROR="mirror.arvancloud.ir"
+    BUILD_ARGS="--build-arg MIRROR=$MIRROR"
 fi
 
-# 2. Create directory and copy template
+# 2. Local Environment Setup
+echo -e "${CYAN}[2/7] Preparing site directories & template...${NC}"
 mkdir -p "$SITE_DIR"
 cp -r "$BASE_DIR/site-template/"* "$SITE_DIR/" 2>/dev/null || true
 cp "$BASE_DIR/site-template/Dockerfile" "$SITE_DIR/" 2>/dev/null || true
+echo "    Files copied from template."
 
-# 3. Generate Random Passwords (only if not already set in existing .env)
-DB_PASS=""
-WP_ADMIN_PASS=$(openssl rand -base64 12)
-ROOT_DB_PASS=""
-OLS_PASS=$(openssl rand -base64 12 | tr -dc 'a-zA-Z0-9' | head -c 12)
-
-if [ -f "$SITE_DIR/.env" ]; then
-    echo "    [EXISTING SITE] Preserving existing database passwords..."
-    DB_PASS=$(grep '^DB_PASSWORD=' "$SITE_DIR/.env" | cut -d'=' -f2-)
-    ROOT_DB_PASS=$(grep '^DB_ROOT_PASSWORD=' "$SITE_DIR/.env" | cut -d'=' -f2-)
-fi
-
-# Fallback if not found or new site
-if [ -z "$DB_PASS" ]; then DB_PASS=$(openssl rand -base64 12); fi
-if [ -z "$ROOT_DB_PASS" ]; then ROOT_DB_PASS=$(openssl rand -base64 16); fi
-
+# 3. Port & Subnet Allocation
+echo -e "${CYAN}[3/7] Allocating network resources (Ports & Subnets)...${NC}"
 # Find next available ports starting at 8082 and 7080
 APP_PORT=8082
 OLS_ADMIN_PORT=7080
@@ -90,13 +74,31 @@ echo "    Assigned HTTP Port: $APP_PORT"
 echo "    Assigned OLS Port: $OLS_ADMIN_PORT"
 echo "    Assigned Subnet:   $SUBNET"
 
-# 4. Create .env file with Metadata
+# 4. Environment & Credentials Configuration
+echo -e "${CYAN}[4/7] Generating site credentials & .env configuration...${NC}"
+# 3. Generate Random Passwords (only if not already set in existing .env)
+DB_PASS=""
+WP_ADMIN_PASS=$(openssl rand -base64 12)
+ROOT_DB_PASS=""
+OLS_PASS=$(openssl rand -base64 12 | tr -dc 'a-zA-Z0-9' | head -c 12)
+
+if [ -f "$SITE_DIR/.env" ]; then
+    echo "    [EXISTING SITE] Preserving existing database passwords..."
+    DB_PASS=$(grep '^DB_PASSWORD=' "$SITE_DIR/.env" | cut -d'=' -f2-)
+    ROOT_DB_PASS=$(grep '^DB_ROOT_PASSWORD=' "$SITE_DIR/.env" | cut -d'=' -f2-)
+fi
+
+# Fallback if not found or new site
+if [ -z "$DB_PASS" ]; then DB_PASS=$(openssl rand -base64 12); fi
+if [ -z "$ROOT_DB_PASS" ]; then ROOT_DB_PASS=$(openssl rand -base64 16); fi
+
 cat <<EOF > "$SITE_DIR/.env"
 # Site Configuration
 PROJECT_NAME=$SITE_NAME
 APP_PORT=$APP_PORT
 DOMAIN_NAME=$DOMAIN_NAME
 SUBNET=$SUBNET
+MIRROR=$MIRROR
 
 # OpenLiteSpeed WebAdmin
 OLS_ADMIN_PORT=$OLS_ADMIN_PORT
@@ -125,9 +127,10 @@ SECURE_AUTH_KEY='$(openssl rand -base64 48)'
 LOGGED_IN_KEY='$(openssl rand -base64 48)'
 NONCE_KEY='$(openssl rand -base64 48)'
 EOF
+echo "    Security salts and .env file generated."
 
-# 5. Create System User (for SFTP/FTP) & Set Permissions
-echo ">>> Configuring system user $SFTP_USER..."
+# 5. User Isolation & System Permissions
+echo -e "${CYAN}[5/7] Configuring system user & file permissions...${NC}"
 if ! id "$SFTP_USER" &>/dev/null; then
     useradd -d "$SITE_DIR" -M -s /usr/sbin/nologin "$SFTP_USER"
     echo "    Created user $SFTP_USER."
@@ -135,19 +138,18 @@ else
     usermod -d "$SITE_DIR" -s /usr/sbin/nologin "$SFTP_USER"
     echo "    Updated existing user $SFTP_USER."
 fi
-
 # Set password
 echo "$SFTP_USER:$SFTP_PASS" | chpasswd
-
 # Set Permissions (Host side)
 chown -R "$SFTP_USER:$SFTP_USER" "$SITE_DIR"
 chmod -R 775 "$SITE_DIR"
+echo "    Permissions set for $SFTP_USER."
 
-# 6. Register with Dashboard
+# 6. Dashboard Registration
+echo -e "${CYAN}[6/7] Registering site with Central Dashboard...${NC}"
 HOMEPAGE_FILE="$BASE_DIR/shared/homepage/services.yaml"
 if [ -f "$HOMEPAGE_FILE" ]; then
     if ! grep -q "$DOMAIN_NAME" "$HOMEPAGE_FILE"; then
-        echo ">>> Registering with Dashboard..."
         if ! grep -q -- "- Sites:" "$HOMEPAGE_FILE"; then
             echo -e "\n- Sites:" >> "$HOMEPAGE_FILE"
         fi
@@ -160,11 +162,14 @@ if [ -f "$HOMEPAGE_FILE" ]; then
             type: wordpress
             url: http://${SITE_NAME}_wp
 EOF
+        echo "    Site added to Homepage config."
+    else
+        echo "    Site already present in Dashboard."
     fi
 fi
 
-# 7. Launch Site
-echo ">>> Launching containers for $SITE_NAME..."
+# 7. Launching Containers
+echo -e "${CYAN}[7/7] Launching Docker containers...${NC}"
 
 # Detect Proxy Support (if using SSH Tunnel/VPN)
 PROXY_ARGS=""

@@ -5,6 +5,8 @@ services:
   wordpress:
     build:
       context: .
+      args:
+        - MIRROR=${MIRROR:-}
     container_name: ${PROJECT_NAME}_wp
     shm_size: '1gb'
     ports:
