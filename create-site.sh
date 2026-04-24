@@ -58,14 +58,19 @@ APP_PORT=8082
 OLS_ADMIN_PORT=7080
 SUBNET_IP=20 # Start at 172.20.x.0
 SITES_DIR="$BASE_DIR/sites"
+
 if [ -d "$SITES_DIR" ]; then
-    while grep -qr "APP_PORT=$APP_PORT" "$SITES_DIR" 2>/dev/null; do
+    echo "    Scanning existing .env files for used resources..."
+    # Create a temporary list of all used resources to avoid repeated disk scans in loops
+    USED_RESOURCES=$(find "$SITES_DIR" -maxdepth 2 -name ".env" -exec cat {} + 2>/dev/null)
+    
+    while echo "$USED_RESOURCES" | grep -q "APP_PORT=$APP_PORT"; do
         APP_PORT=$((APP_PORT + 1))
     done
-    while grep -qr "OLS_ADMIN_PORT=$OLS_ADMIN_PORT" "$SITES_DIR" 2>/dev/null; do
+    while echo "$USED_RESOURCES" | grep -q "OLS_ADMIN_PORT=$OLS_ADMIN_PORT"; do
         OLS_ADMIN_PORT=$((OLS_ADMIN_PORT + 1))
     done
-    while grep -qr "SUBNET=172.20.$SUBNET_IP.0/24" "$SITES_DIR" 2>/dev/null; do
+    while echo "$USED_RESOURCES" | grep -q "172.20.$SUBNET_IP.0/24"; do
         SUBNET_IP=$((SUBNET_IP + 1))
     done
 fi
