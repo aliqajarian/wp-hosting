@@ -86,6 +86,8 @@ services:
     environment:
       - TZ=Asia/Tehran
       - HTTPS=OFF
+      - DISABLE_CLAMAV=TRUE
+      - DISABLE_RSPAMD=TRUE
     ports:
       - "25:25"
       - "110:110"

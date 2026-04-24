@@ -47,7 +47,12 @@ if [ ! -f "$MARKER" ]; then
     if [ -f "$LOCAL_WP_CLI" ]; then
         [ "$IS_ROOT" = true ] && cp "$LOCAL_WP_CLI" /usr/local/bin/wp
     else
-        curl -sL -o /usr/local/bin/wp https://raw.githubusercontent.com/wp-cli/builds/gh-pages/phar/wp-cli.phar
+        # Try primary source, fallback to official site
+        if ! curl -sL --connect-timeout 15 --max-time 60 -o /usr/local/bin/wp https://raw.githubusercontent.com/wp-cli/builds/gh-pages/phar/wp-cli.phar; then
+            echo "[WP-HOSTING] Primary source failed, trying official site..."
+            curl -sL --connect-timeout 20 --max-time 120 -o /usr/local/bin/wp https://wp-cli.org/phar/wp-cli.phar || \
+            echo "[WARNING] WP-CLI download failed."
+        fi
         chmod +x /usr/local/bin/wp
     fi
 

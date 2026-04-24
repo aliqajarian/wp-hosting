@@ -179,96 +179,27 @@ EOF
     fi
 }
 
-# --- HELPER: Create Base Config ---
-create_base_config() {
-    # 1. Download Iran IP Ranges
+# --- HELPER: Update Iran ACL ---
+update_iran_acl() {
     echo -e "${YELLOW}--> Downloading Iran IP Ranges...${NC}"
-    IRAN_CIDR_URL="https://raw.githubusercontent.com/herrbischoff/country-ip-blocks/master/ipv4/ir.cidr"
+    IRAN_CIDR_GITHUB="https://raw.githubusercontent.com/herrbischoff/country-ip-blocks/master/ipv4/ir.cidr"
+    IRAN_CIDR_IPDENY="https://www.ipdeny.com/ipblocks/data/countries/ir.zone"
     
     echo "acl \"iran\" {" > "$CONFIG_DIR/named.conf.iran-acl"
-    curl -s "$IRAN_CIDR_URL" | sed 's/$/;/' >> "$CONFIG_DIR/named.conf.iran-acl"
-    echo "};" >> "$CONFIG_DIR/named.conf.iran-acl"
-    
-    # 2. Base named.conf
-    cat <<EOF > "$CONFIG_DIR/named.conf"
-options {
-    directory "/var/cache/bind";
-    recursion no;
-    allow-query { any; };
-    allow-transfer { none; };
-    listen-on { any; };
-    listen-on-v6 { any; };
-};
-
-include "/etc/bind/named.conf.iran-acl";
-
-# VIEW: IRAN (Domestic Traffic)
-view "iran" {
-    match-clients { iran; };
-    recursion no;
-    include "/etc/bind/named.conf.zones.iran";
-};
-
-# VIEW: WORLD (International Traffic)
-view "world" {
-    match-clients { any; };
-    recursion no;
-    include "/etc/bind/named.conf.zones.world";
-};
-EOF
-    
-    # 3. Create empty zone lists
-    touch "$CONFIG_DIR/named.conf.zones.iran"
-    touch "$CONFIG_DIR/named.conf.zones.world"
-    
-    echo -e "${GREEN}[SUCCESS] BIND9 configuration initialized.${NC}"
-}
-
-# --- HELPER: Register with Dashboard ---
-register_dashboard() {
-    HOMEPAGE_FILE="$BASE_DIR/shared/homepage/services.yaml"
-    
-    if [ -f "$HOMEPAGE_FILE" ]; then
-        if ! grep -q "GeoDNS Manager" "$HOMEPAGE_FILE"; then
-            echo -e "${YELLOW}--> Adding GeoDNS to Manager Dashboard...${NC}"
-            
-            # Use specific insertion to keep YAML valid
-            # We append it to the end or a specific section
-            cat <<EOF >> "$HOMEPAGE_FILE"
-
-    - GeoDNS Manager:
-        icon: dns.png
-        href: "http://$(hostname -I | cut -d' ' -f1):1337"
-        description: "Manage Zones & records"
-        widget:
-            type: olivetin
-            url: http://shared_geodns_ui:1337
-EOF
-            echo -e "${GREEN}[SUCCESS] Added to Dashboard!${NC}"
-        else
-            echo "Dashboard already configured."
-        fi
-    else
-        echo -e "${YELLOW}[NOTE] Dashboard Config not found locally.${NC}"
-        echo "If this is a remote node, add this to your Manager's services.yaml:"
-        echo ""
-        echo "    - GeoDNS ($(hostname)):"
-        echo "        icon: dns.png"
-        echo "        href: \"http://$(hostname -I | cut -d' ' -f1):1337\""
-        echo "        description: \"DNS Manager for $(hostname)\""
-        echo ""
+    # Try GitHub first, then IPDeny as an official mirror
+    if ! curl -sL --connect-timeout 15 --max-time 60 "$IRAN_CIDR_GITHUB" | sed 's/$/;/' >> "$CONFIG_DIR/named.conf.iran-acl"; then
+        echo -e "${YELLOW}[WARNING] GitHub failed, trying official mirror (IPDeny)...${NC}"
+        curl -sL --connect-timeout 15 --max-time 60 "$IRAN_CIDR_IPDENY" | sed 's/$/;/' >> "$CONFIG_DIR/named.conf.iran-acl" || \
+        echo -e "${RED}[ERROR] Failed to download Iran IP ranges.${NC}"
     fi
+    echo "};" >> "$CONFIG_DIR/named.conf.iran-acl"
+    echo -e "${GREEN}[SUCCESS] Iran IP ACL updated.${NC}"
 }
 
 # --- HELPER: Create Base Config ---
 create_base_config() {
     # 1. Download Iran IP Ranges
-    echo -e "${YELLOW}--> Downloading Iran IP Ranges...${NC}"
-    IRAN_CIDR_URL="https://raw.githubusercontent.com/herrbischoff/country-ip-blocks/master/ipv4/ir.cidr"
-    
-    echo "acl \"iran\" {" > "$CONFIG_DIR/named.conf.iran-acl"
-    curl -s "$IRAN_CIDR_URL" | sed 's/$/;/' >> "$CONFIG_DIR/named.conf.iran-acl"
-    echo "};" >> "$CONFIG_DIR/named.conf.iran-acl"
+    update_iran_acl
     
     # 2. Base named.conf
     cat <<EOF > "$CONFIG_DIR/named.conf"

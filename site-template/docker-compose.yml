@@ -3,49 +3,43 @@ services:
   # [WEB] WORDPRESS CONTAINER (OPENLITESPEED)
   # ==========================================
   wordpress:
-    build: .
+    build:
+      context: .
     container_name: ${PROJECT_NAME}_wp
+    shm_size: '1gb'
     ports:
       - "${APP_PORT}:80"
       - "${OLS_ADMIN_PORT}:7080"
-    restart: unless-stopped
     deploy:
       resources:
         limits:
-          memory: 1024M
-    # OpenLiteSpeed entrypoint replaces apache2-foreground
-    # entrypoint: [ "/bin/bash", "/usr/local/bin/wp-init.sh" ]
+          memory: 2048M
+    restart: unless-stopped
     environment:
-      WORDPRESS_DB_HOST: ${PROJECT_NAME}_db
+      WORDPRESS_DB_HOST: db
       WORDPRESS_DB_USER: ${DB_USER}
       WORDPRESS_DB_PASSWORD: ${DB_PASSWORD}
       WORDPRESS_DB_NAME: ${DB_NAME}
-      OLS_ADMIN_PASS: ${OLS_ADMIN_PASS:-}
-      http_proxy: ${http_proxy:-}
-      https_proxy: ${https_proxy:-}
-      all_proxy: ${all_proxy:-}
-      no_proxy: ${no_proxy:-}
-
     volumes:
-      # OLS Document Root
-      - ./:/var/www/vhosts/localhost/html
-      # - ./lsws/conf:/usr/local/lsws/conf
-      # - ./lsws/admin-conf:/usr/local/lsws/admin/conf
+      - ./lsws/${PROJECT_NAME}:/usr/local/lsws/${PROJECT_NAME}
+      - .:/var/www/vhosts/localhost/html
+      - ./lsws/conf:/usr/local/lsws/conf
+      - ./lsws/admin-conf:/usr/local/lsws/admin/conf
       - /etc/letsencrypt:/etc/letsencrypt:ro
-    depends_on:
-      - db
-      - redis
-    networks:
-      - wp_net
-      - wp_shared_net
     labels:
       - "traefik.enable=true"
-      - "traefik.http.routers.${PROJECT_NAME}.rule=Host(`${DOMAIN_NAME}`)"
+      - "traefik.http.routers.${PROJECT_NAME}.rule=Host(`${DOMAIN_NAME}`) || Host(`www.${DOMAIN_NAME}`)"
       - "traefik.http.routers.${PROJECT_NAME}.entrypoints=websecure"
       - "traefik.http.routers.${PROJECT_NAME}.tls=true"
       - "traefik.http.routers.${PROJECT_NAME}.tls.certresolver=myresolver"
       - "traefik.http.services.${PROJECT_NAME}.loadbalancer.server.port=80"
       - "traefik.docker.network=wp_shared_net"
+    networks:
+      - wp_net
+      - wp_shared_net
+    depends_on:
+      - db
+      - redis
 
   # ==========================================
   # [DB] MARIADB CONTAINER
@@ -53,41 +47,41 @@ services:
   db:
     image: mariadb:10.11
     container_name: ${PROJECT_NAME}_db
-    restart: unless-stopped
     deploy:
       resources:
         limits:
-          memory: 768M
+          memory: 1024M
+    restart: unless-stopped
     environment:
-      MYSQL_DATABASE: ${DB_NAME}
-      MYSQL_USER: ${DB_USER}
-      MYSQL_PASSWORD: ${DB_PASSWORD}
-      MYSQL_ROOT_PASSWORD: ${DB_ROOT_PASSWORD}
+      MARIADB_DATABASE: ${DB_NAME}
+      MARIADB_USER: ${DB_USER}
+      MARIADB_PASSWORD: ${DB_PASSWORD}
+      MARIADB_ROOT_PASSWORD: ${DB_ROOT_PASSWORD}
     volumes:
       - db_data:/var/lib/mysql
     networks:
       - wp_net
-      - wp_shared_net
-    command: >
-      --max-connections=100 --innodb-buffer-pool-size=128M --query-cache-type=0 --query-cache-size=0
 
   # ==========================================
   # [CACHE] REDIS
   # ==========================================
   redis:
-    image: redis:alpine
+    image: redis:6-alpine
     container_name: ${PROJECT_NAME}_redis
-    restart: unless-stopped
     deploy:
       resources:
         limits:
-          memory: 256M
+          memory: 1024M
+    restart: unless-stopped
     networks:
       - wp_net
 
 networks:
   wp_net:
     internal: true
+    ipam:
+      config:
+        - subnet: ${SUBNET:-172.20.0.0/24}
   wp_shared_net:
     external: true
 
