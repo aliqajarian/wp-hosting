@@ -72,6 +72,7 @@ if [ -z "$ROOT_DB_PASS" ]; then ROOT_DB_PASS=$(openssl rand -base64 16); fi
 # Find next available ports starting at 8082 and 7080
 APP_PORT=8082
 OLS_ADMIN_PORT=7080
+SUBNET_IP=20 # Start at 172.20.x.0
 SITES_DIR="$BASE_DIR/sites"
 if [ -d "$SITES_DIR" ]; then
     while grep -qr "APP_PORT=$APP_PORT" "$SITES_DIR" 2>/dev/null; do
@@ -80,9 +81,14 @@ if [ -d "$SITES_DIR" ]; then
     while grep -qr "OLS_ADMIN_PORT=$OLS_ADMIN_PORT" "$SITES_DIR" 2>/dev/null; do
         OLS_ADMIN_PORT=$((OLS_ADMIN_PORT + 1))
     done
+    while grep -qr "SUBNET=172.20.$SUBNET_IP.0/24" "$SITES_DIR" 2>/dev/null; do
+        SUBNET_IP=$((SUBNET_IP + 1))
+    done
 fi
+SUBNET="172.20.$SUBNET_IP.0/24"
 echo "    Assigned HTTP Port: $APP_PORT"
 echo "    Assigned OLS Port: $OLS_ADMIN_PORT"
+echo "    Assigned Subnet:   $SUBNET"
 
 # 4. Create .env file with Metadata
 cat <<EOF > "$SITE_DIR/.env"
@@ -90,6 +96,7 @@ cat <<EOF > "$SITE_DIR/.env"
 PROJECT_NAME=$SITE_NAME
 APP_PORT=$APP_PORT
 DOMAIN_NAME=$DOMAIN_NAME
+SUBNET=$SUBNET
 
 # OpenLiteSpeed WebAdmin
 OLS_ADMIN_PORT=$OLS_ADMIN_PORT

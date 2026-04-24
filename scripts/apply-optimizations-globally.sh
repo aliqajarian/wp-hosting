@@ -15,8 +15,18 @@ for site in "$SITES_DIR"/*; do
         SITE_NAME=$(basename "$site")
         echo ">>> Optimizing site: $SITE_NAME"
 
-        # 1. Update/Add Resource Limits to docker-compose.yml
-        echo "    Applying user-preferred memory footprint to docker-compose.yml..."
+        # 1. Update/Add Resource Limits & Subnet to docker-compose.yml
+        echo "    Applying user-preferred footprint and subnets..."
+        
+        # Assign unique subnet if not in .env
+        if ! grep -q "SUBNET=" "$site/.env"; then
+            SUBNET_IP=20
+            while grep -qr "SUBNET=172.20.$SUBNET_IP.0/24" "$SITES_DIR" 2>/dev/null; do
+                SUBNET_IP=$((SUBNET_IP + 1))
+            done
+            echo "SUBNET=172.20.$SUBNET_IP.0/24" >> "$site/.env"
+        fi
+
         # WordPress (2048M)
         sed -i '/container_name: ${PROJECT_NAME}_wp/{n;n;n;s/memory: .*/memory: 2048M/}' "$site/docker-compose.yml" || true
         # DB (1024M)

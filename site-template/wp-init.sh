@@ -66,7 +66,7 @@ if [ -f "$PHP_INI" ]; then
     sed -i "s/upload_max_filesize = .*/upload_max_filesize = 128M/" "$PHP_INI"
     sed -i "s/post_max_size = .*/post_max_size = 128M/" "$PHP_INI"
     sed -i "s/max_execution_time = .*/max_execution_time = 300/" "$PHP_INI"
-    sed -i "s/memory_limit = .*/memory_limit = 512M/" "$PHP_INI"
+    sed -i "s/memory_limit = .*/memory_limit = 1024M/" "$PHP_INI"
     if grep -q 'max_input_vars' "$PHP_INI"; then
         sed -i 's/^;\?max_input_vars = .*/max_input_vars = 3000/' "$PHP_INI"
     else
@@ -75,7 +75,7 @@ if [ -f "$PHP_INI" ]; then
 fi
 
 # WP-CLI helper: always run with 512M to prevent memory exhaustion
-WPCLI="php -d memory_limit=512M /usr/local/bin/wp"
+WPCLI="php -d memory_limit=1024M /usr/local/bin/wp"
 
 cd "$DOCROOT"
 
@@ -145,8 +145,8 @@ EOF
     cat << 'EOF' > wp-custom.php
 <?php
 /* Managed by WP-HOSTING */
-define('WP_MEMORY_LIMIT', '512M');
-define('WP_MAX_MEMORY_LIMIT', '1024M');
+define('WP_MEMORY_LIMIT', '1024M');
+define('WP_MAX_MEMORY_LIMIT', '1536M');
 define('FS_METHOD', 'direct');
 
 /* Redis Configuration (Object Cache) */
