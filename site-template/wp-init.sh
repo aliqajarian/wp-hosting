@@ -81,8 +81,24 @@ cd "$DOCROOT"
 
 # --- 3. Setup core WP files & wp-config if missing ---
 if [ ! -f wp-includes/version.php ]; then
-    echo "[WP-HOSTING] Downloading WordPress Core..."
-    $WPCLI core download --allow-root --path="$DOCROOT"
+    if [ -f "$DOCROOT/wordpress-fa.tar.gz" ]; then
+        echo "[WP-HOSTING] Found local WordPress archive. Extracting..."
+        tar -xzf "$DOCROOT/wordpress-fa.tar.gz" -C "$DOCROOT"
+        
+        # If the tarball contained a 'wordpress' directory, move contents up
+        if [ -d "$DOCROOT/wordpress" ]; then
+            mv "$DOCROOT/wordpress/"* "$DOCROOT/"
+            rmdir "$DOCROOT/wordpress"
+        fi
+        rm "$DOCROOT/wordpress-fa.tar.gz"
+        echo "[WP-HOSTING] WordPress extracted from local archive."
+    else
+        echo "[WP-HOSTING] Local archive not found. Downloading WordPress Core..."
+        if ! $WPCLI core download --allow-root --path="$DOCROOT"; then
+            echo "[ERROR] WordPress download failed. Please ensure wordpress-fa.tar.gz is in the server root."
+            exit 1
+        fi
+    fi
 fi
 
 # We use a hardcoded, clean wp-config.php that doesn't rely on OLS passing environment arrays.
@@ -329,5 +345,20 @@ fi
 
 # --- 6. Start OpenLiteSpeed ---
 echo "[WP-HOSTING] Starting OpenLiteSpeed Web Server..."
-/usr/local/lsws/bin/lswsctrl start
-tail -f /usr/local/lsws/logs/access.log /usr/local/lsws/logs/error.log
+if [ -x "${LSWS_HOME}/bin/lswsctrl" ]; then
+    cd "${LSWS_HOME}/bin" && ./lswsctrl start
+    
+    # Verify if it started
+    sleep 2
+    if pgrep -x "lshttpd" > /dev/null; then
+        echo "[WP-HOSTING] OpenLiteSpeed started successfully."
+    else
+        echo "[ERROR] OpenLiteSpeed failed to start. Check /usr/local/lsws/logs/error.log"
+    fi
+else
+    echo "[ERROR] lswsctrl not found in ${LSWS_HOME}/bin"
+    exit 1
+fi
+
+# Multi-file tail
+tail -f /usr/local/lsws/logs/access.log /usr/local/lsws/logs/error.log 2>/dev/null || tail -f /dev/null

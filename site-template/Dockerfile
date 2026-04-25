@@ -3,6 +3,9 @@
 # ==========================================
 FROM litespeedtech/openlitespeed:1.7.19-lsphp82
 
+# Set LiteSpeed Home environment
+ENV LSWS_HOME=/usr/local/lsws
+
 # Use Mirror if provided (Optimizes for restricted environments like Iran)
 ARG MIRROR
 RUN if [ -n "$MIRROR" ]; then \

@@ -49,6 +49,10 @@ echo -e "${CYAN}[2/7] Preparing site directories & template...${NC}"
 mkdir -p "$SITE_DIR"
 cp -r "$BASE_DIR/site-template/"* "$SITE_DIR/" 2>/dev/null || true
 cp "$BASE_DIR/site-template/Dockerfile" "$SITE_DIR/" 2>/dev/null || true
+if [ -f "$BASE_DIR/wordpress-fa.tar.gz" ]; then
+    cp "$BASE_DIR/wordpress-fa.tar.gz" "$SITE_DIR/"
+    echo "    Local WordPress archive copied to site directory."
+fi
 echo "    Files copied from template."
 
 # 3. Port & Subnet Allocation
