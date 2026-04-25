@@ -64,16 +64,27 @@ SUBNET_IP=20 # Start at 172.20.x.0
 SITES_DIR="$BASE_DIR/sites"
 
 if [ -d "$SITES_DIR" ]; then
-    echo "    Scanning existing .env files for used resources..."
-    # Create a temporary list of all used resources to avoid repeated disk scans in loops
+    echo "    Scanning existing configs and host system for used resources..."
+    # 1. Get resources from .env files
     USED_RESOURCES=$(find "$SITES_DIR" -maxdepth 2 -name ".env" -exec cat {} + 2>/dev/null)
     
-    while echo "$USED_RESOURCES" | grep -q "APP_PORT=$APP_PORT"; do
+    # 2. Get currently listening ports on the host (real source of truth)
+    # This catches ports used by sites, shared tools, or other system processes.
+    LISTENING_PORTS=$(ss -tln | awk '{print $4}' | grep -oP '(?<=:)\d+$' | sort -un)
+
+    check_port_used() {
+        local port=$1
+        echo "$USED_RESOURCES" | grep -q "PORT=$port" || echo "$LISTENING_PORTS" | grep -qx "$port"
+    }
+
+    while check_port_used "$APP_PORT"; do
         APP_PORT=$((APP_PORT + 1))
     done
-    while echo "$USED_RESOURCES" | grep -q "OLS_ADMIN_PORT=$OLS_ADMIN_PORT"; do
+    while check_port_used "$OLS_ADMIN_PORT"; do
         OLS_ADMIN_PORT=$((OLS_ADMIN_PORT + 1))
     done
+    
+    # Subnets are still scanned via .env as they aren't "listening" on the host the same way
     while echo "$USED_RESOURCES" | grep -q "172.20.$SUBNET_IP.0/24"; do
         SUBNET_IP=$((SUBNET_IP + 1))
     done
