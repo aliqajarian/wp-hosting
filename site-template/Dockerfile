@@ -26,6 +26,10 @@ RUN apt-get update && apt-get install -y \
     unzip \
     && apt-get clean && rm -rf /var/lib/apt/lists/*
 
+# Backup default configuration (to restore if bind mounts are empty)
+RUN cp -rp /usr/local/lsws/conf /usr/local/lsws/conf.backup && \
+    cp -rp /usr/local/lsws/admin/conf /usr/local/lsws/admin/conf.backup
+
 # Fix PHP path for WP-CLI
 RUN ln -sf /usr/local/lsws/lsphp82/bin/php /usr/local/bin/php
 

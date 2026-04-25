@@ -59,6 +59,18 @@ if [ ! -f "$MARKER" ]; then
     [ "$IS_ROOT" = true ] && touch "$MARKER"
 fi
 
+# --- 2.2 Bootstrap LSWS config if missing (handle empty bind mounts) ---
+if [ ! -f /usr/local/lsws/conf/httpd_config.conf ]; then
+    echo "[WP-HOSTING] LSWS config missing from bind mount! Restoring from internal backup..."
+    if [ -d /usr/local/lsws/conf.backup ]; then
+        cp -rp /usr/local/lsws/conf.backup/* /usr/local/lsws/conf/
+        cp -rp /usr/local/lsws/admin/conf.backup/* /usr/local/lsws/admin/conf/
+        echo "[WP-HOSTING] Configuration restored."
+    else
+        echo "[ERROR] Internal backup not found. Re-build the image."
+    fi
+fi
+
 # --- 2.5 PHP INI Adjustments ---
 PHP_INI="/usr/local/lsws/lsphp82/etc/php/8.2/litespeed/php.ini"
 if [ -f "$PHP_INI" ]; then

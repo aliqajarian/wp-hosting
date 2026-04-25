@@ -174,14 +174,14 @@ for i in {1..60}; do
     sleep 2
 done
 
-# Define WP_CMD to Use inside docker exec with 512M memory limit
+# Define WP_CMD to Use inside docker exec with 1024M memory limit
 DOCROOT="/var/www/vhosts/localhost/html"
-WP_CMD="php -d memory_limit=512M /usr/local/bin/wp"
+WP_CMD="php -d memory_limit=1024M /usr/local/bin/wp"
 
 if ! docker exec -w $DOCROOT "$WP_CONTAINER" $WP_CMD --version --allow-root >/dev/null 2>&1; then
      echo -e "${RED}[ERROR] WP-CLI is not functional. Search & Replace skipped!${NC}"
      echo "        Please run it manually later:"
-     echo "        docker exec -w $DOCROOT $WP_CONTAINER php -d memory_limit=512M /usr/local/bin/wp search-replace '$OLD_DOMAIN_CLEAN' '$NEW_DOMAIN_CLEAN' --all-tables --allow-root"
+     echo "        docker exec -w $DOCROOT $WP_CONTAINER php -d memory_limit=1024M /usr/local/bin/wp search-replace '$OLD_DOMAIN_CLEAN' '$NEW_DOMAIN_CLEAN' --all-tables --allow-root"
 else
     # Perform search-replace
     echo "    Running: search-replace '$OLD_DOMAIN_CLEAN' -> '$NEW_DOMAIN_CLEAN'"
