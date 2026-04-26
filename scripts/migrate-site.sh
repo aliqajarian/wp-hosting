@@ -136,9 +136,9 @@ chmod -R 775 "$SITE_DIR"
 # Step 3: Database Import
 echo -e "${GREEN}>>> Step 3: Importing database...${NC}"
 DB_CONTAINER="${SITE_NAME}_db"
-DB_NAME=$(grep "DB_NAME=" "$SITE_DIR/.env" | cut -d'=' -f2)
-DB_USER=$(grep "DB_USER=" "$SITE_DIR/.env" | cut -d'=' -f2)
-DB_PASS=$(grep "DB_PASSWORD=" "$SITE_DIR/.env" | cut -d'=' -f2)
+DB_NAME=$(grep "^DB_NAME=" "$SITE_DIR/.env" | cut -d'=' -f2- | tr -d '\r')
+DB_USER=$(grep "^DB_USER=" "$SITE_DIR/.env" | cut -d'=' -f2- | tr -d '\r')
+DB_PASS=$(grep "^DB_PASSWORD=" "$SITE_DIR/.env" | cut -d'=' -f2- | tr -d '\r')
 
 # Wait for DB to be ready
 echo "    Waiting for MariaDB to initialize..."
@@ -151,15 +151,24 @@ done
 
 # Import using docker exec with collation fix (utf8mb4_0900_ai_ci is MySQL 8 only)
 echo "    Processing SQL and importing (auto-fixing collations)..."
+TMP_SQL="/tmp/${SITE_NAME}_migration.sql"
+
+# Pre-process the SQL dump (fixes collations and removes CREATE DATABASE / USE statements which can hijack the target database)
 sed -e 's/utf8mb4_0900_ai_ci/utf8mb4_unicode_ci/g' \
     -e 's/utf8mb4_unicode_520_ci/utf8mb4_unicode_ci/g' \
-    "$SQP_PATH" | docker exec -i "$DB_CONTAINER" mysql -u"$DB_USER" -p"$DB_PASS" "$DB_NAME"
+    -e '/^[[:space:]]*CREATE DATABASE/Id' \
+    -e '/^[[:space:]]*USE /Id' \
+    "$SQP_PATH" > "$TMP_SQL"
 
-if [ $? -eq 0 ]; then
+# Perform import preventing password escaping issues and preventing empty pipe hangs
+if docker exec -e MYSQL_PWD="$DB_PASS" -i "$DB_CONTAINER" mysql -u"$DB_USER" "$DB_NAME" < "$TMP_SQL"; then
     echo "    Database imported successfully."
 else
     echo -e "${RED}[ERROR] Database import failed.${NC}"
 fi
+
+# Cleanup
+rm -f "$TMP_SQL"
 
 # Step 4: Search and Replace
 echo -e "${GREEN}>>> Step 4: Updating URLs in database...${NC}"
