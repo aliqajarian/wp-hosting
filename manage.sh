@@ -159,9 +159,10 @@ menu_access_tools() {
     echo "9. Localize Google Fonts (Download Vazirmatn...)"
     echo "10. View Credentials (DB/SFTP)"
     echo "11. Quick Replication Setup (Change Primary/Mode)"
-    echo "12. DELETE SITE (Permanent)"
+    echo "12. Manage SSL (Local Certificates)"
+    echo "13. DELETE SITE (Permanent)"
     
-    read -p "Select Tool [1-12]: " TOOL_OPT
+    read -p "Select Tool [1-13]: " TOOL_OPT
     
     case $TOOL_OPT in
         1) cd "$CURRENT_DIR/sites/$SITE_NAME" && docker compose up -d ;;
@@ -206,6 +207,10 @@ menu_access_tools() {
             bash ./scripts/manage-replication.sh "$SITE_NAME"
             ;;
         12)
+            DOMAIN=$(grep "DOMAIN_NAME=" "$CURRENT_DIR/sites/$SITE_NAME/.env" | cut -d '=' -f2 | tr -d '\r')
+            bash ./scripts/manage-ssl.sh "$DOMAIN"
+            ;;
+        13)
             bash ./scripts/delete-site.sh "$SITE_NAME"
             ;;
     esac
