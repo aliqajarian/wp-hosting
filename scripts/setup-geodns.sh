@@ -35,8 +35,10 @@ mkdir -p "$CONFIG_DIR" "$RECORDS_DIR" "$CACHE_DIR"
 create_docker_compose() {
     # 1. Custom UI Dockerfile (Need Docker CLI inside)
     cat <<EOF > "$BIND_DIR/Dockerfile.ui"
-FROM olivetin/olivetin:latest
-RUN apk add --no-cache docker-cli bash curl
+FROM jamesread/olivetin:latest
+USER root
+RUN microdnf install -y docker bash curl || dnf install -y docker-cli bash curl
+USER olivetin
 EOF
 
     # 2. BIND9 + UI Compose
@@ -99,7 +101,8 @@ actions:
 
   - title: "List Domains & IPs"
     icon: "format-list-bulleted"
-    shell: "grep 'zone \"' /etc/bind/named.conf.zones.world | cut -d '\"' -f 2 | while read domain; do echo \"\$domain (World: \$(grep -E '@\s+IN\s+A' /var/lib/bind/db.\$domain.world | awk '{print \$NF}' | head -1))\"; done"
+    shell: |
+      grep 'zone "' /etc/bind/named.conf.zones.world | cut -d '"' -f 2 | while read domain; do echo "\$domain (World: \$(grep -E '@\s+IN\s+A' /var/lib/bind/db.\$domain.world | awk '{print \$NF}' | head -1))"; done
 
   - title: "Add New Domain"
     icon: "plus-box"
